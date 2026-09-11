@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block title %}Préstamos: {{ estado }}{% endblock %}
+
+{% block content %}
+    <div class="card">
+        <h2>Préstamos en estado: {{ estado }}</h2>
+        <p>
+            <a href="{% url 'prestamos:prestamos_por_estado' 'activo' %}">Activos</a> |
+            <a href="{% url 'prestamos:prestamos_por_estado' 'devuelto' %}">Devueltos</a> |
+            <a href="{% url 'prestamos:prestamos_por_estado' 'vencido' %}">Vencidos</a>
+        </p>
+        <table>
+            <tr>
+                <th>Libro</th>
+                <th>Lector</th>
+                <th>Fecha de préstamo</th>
+                <th>Estado</th>
+            </tr>
+            {% for prestamo in prestamos %}
+                <tr>
+                    <td>{{ prestamo.libro.titulo }}</td>
+                    <td><a href="{% url 'prestamos:detalle_lector' prestamo.lector.id %}">{{ prestamo.lector.nombre }}</a></td>
+                    <td>{{ prestamo.fecha_prestamo }}</td>
+                    <td>{{ prestamo.get_estado_display }}</td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="4">No hay préstamos en este estado.</td></tr>
+            {% endfor %}
+        </table>
+    </div>
+{% endblock %}

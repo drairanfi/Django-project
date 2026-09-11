@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block title %}Autor: {{ autor.nombre }} {{ autor.apellido }}{% endblock %}
+
+{% block content %}
+    <div class="card">
+        <h2>{{ autor.nombre }} {{ autor.apellido }}</h2>
+        <p><strong>Nacionalidad:</strong> {{ autor.nacionalidad|default:"No informada" }}</p>
+        <h3>Libros de este autor</h3>
+        <ul>
+            {% for libro in libros %}
+                <li>
+                    <a href="{% url 'libros:detalle_libro' libro.id %}">{{ libro.titulo }}</a>
+                    - {{ libro.anio_publicacion }}
+                </li>
+            {% empty %}
+                <li>Este autor todavía no tiene libros cargados.</li>
+            {% endfor %}
+        </ul>
+    </div>
+{% endblock %}

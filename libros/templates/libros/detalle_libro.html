@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}{{ libro.titulo }}{% endblock %}
+
+{% block content %}
+    <div class="card">
+        <h2>{{ libro.titulo }}</h2>
+        <p><strong>ISBN:</strong> {{ libro.isbn }}</p>
+        <p><strong>Año:</strong> {{ libro.anio_publicacion }}</p>
+        <p><strong>Páginas:</strong> {{ libro.paginas }}</p>
+        <p><strong>Categoría:</strong>
+            <a href="{% url 'libros:por_categoria' libro.categoria.id %}">{{ libro.categoria.nombre }}</a>
+        </p>
+        <p><strong>Autores:</strong>
+            {% for autor in libro.autores.all %}
+                <a href="{% url 'libros:por_autor' autor.id %}">{{ autor.nombre }} {{ autor.apellido }}</a>{% if not forloop.last %}, {% endif %}
+            {% endfor %}
+        </p>
+        <p><strong>Préstamos activos:</strong> {{ prestamos_activos }}</p>
+
+        {% if libro.disponible %}
+            <a class="btn" href="{% url 'prestamos:crear_prestamo' libro.id %}">Prestar este libro</a>
+        {% else %}
+            <p><strong>Estado:</strong> prestado en este momento</p>
+        {% endif %}
+    </div>
+{% endblock %}

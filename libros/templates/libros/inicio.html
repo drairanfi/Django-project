@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block title %}Biblioteca Comunitaria{% endblock %}
+
+{% block content %}
+    <div class="card">
+        <h2>Catálogo de libros</h2>
+        <p>Hay <strong>{{ disponibles }}</strong> libros disponibles en la biblioteca.</p>
+    </div>
+
+    <div class="card">
+        <h3>Categorías</h3>
+        {% for categoria in categorias %}
+            <a class="tag" href="{% url 'libros:por_categoria' categoria.id %}">{{ categoria.nombre }}</a>
+        {% endfor %}
+    </div>
+
+    <div class="card">
+        <h3>Todos los libros</h3>
+        <ul>
+            {% for libro in libros %}
+                <li>
+                    <a href="{% url 'libros:detalle_libro' libro.id %}">{{ libro.titulo }}</a>
+                    - {{ libro.categoria.nombre }}
+                    {% if libro.disponible %}
+                        <span class="tag">Disponible</span>
+                    {% else %}
+                        <span class="tag">Prestado</span>
+                    {% endif %}
+                </li>
+            {% empty %}
+                <li>No hay libros cargados todavía.</li>
+            {% endfor %}
+        </ul>
+    </div>
+{% endblock %}

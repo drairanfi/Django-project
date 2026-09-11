@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}{{ lector.nombre }}{% endblock %}
+
+{% block content %}
+    <div class="card">
+        <h2>{{ lector.nombre }}</h2>
+        <p><strong>Email:</strong> {{ lector.email }}</p>
+        <p><strong>Teléfono:</strong> {{ lector.telefono|default:"No informado" }}</p>
+        <p><strong>Registrado desde:</strong> {{ lector.fecha_registro }}</p>
+    </div>
+
+    <div class="card">
+        <h3>Historial de préstamos</h3>
+        <table>
+            <tr>
+                <th>Libro</th>
+                <th>Fecha</th>
+                <th>Estado</th>
+                <th>Acción</th>
+            </tr>
+            {% for prestamo in prestamos %}
+                <tr>
+                    <td><a href="{% url 'libros:detalle_libro' prestamo.libro.id %}">{{ prestamo.libro.titulo }}</a></td>
+                    <td>{{ prestamo.fecha_prestamo }}</td>
+                    <td>{{ prestamo.get_estado_display }}</td>
+                    <td>
+                        {% if prestamo.estado == "activo" %}
+                            <a href="{% url 'prestamos:devolver' prestamo.id %}">Devolver</a>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="4">Este lector no tiene préstamos.</td></tr>
+            {% endfor %}
+        </table>
+    </div>
+{% endblock %}
