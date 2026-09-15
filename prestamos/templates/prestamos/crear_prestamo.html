@@ -3,11 +3,11 @@
 {% block title %}Prestar {{ libro.titulo }}{% endblock %}
 
 {% block content %}
-    <div class="card">
+    <div>
         <h2>Prestar: {{ libro.titulo }}</h2>
 
         {% if mensaje %}
-            <p class="msg">{{ mensaje }}</p>
+            <p>{{ mensaje }}</p>
         {% endif %}
 
         {% if libro.disponible %}
@@ -19,7 +19,7 @@
                         <option value="{{ lector.id }}">{{ lector.nombre }}</option>
                     {% endfor %}
                 </select>
-                <button class="btn" type="submit">Confirmar préstamo</button>
+                <button type="submit">Confirmar préstamo</button>
             </form>
         {% else %}
             <p>Este libro no está disponible.</p>

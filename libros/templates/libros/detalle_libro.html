@@ -3,7 +3,7 @@
 {% block title %}{{ libro.titulo }}{% endblock %}
 
 {% block content %}
-    <div class="card">
+    <div>
         <h2>{{ libro.titulo }}</h2>
         <p><strong>ISBN:</strong> {{ libro.isbn }}</p>
         <p><strong>Año:</strong> {{ libro.anio_publicacion }}</p>
@@ -19,7 +19,7 @@
         <p><strong>Préstamos activos:</strong> {{ prestamos_activos }}</p>
 
         {% if libro.disponible %}
-            <a class="btn" href="{% url 'prestamos:crear_prestamo' libro.id %}">Prestar este libro</a>
+            <a href="{% url 'prestamos:crear_prestamo' libro.id %}">Prestar este libro</a>
         {% else %}
             <p><strong>Estado:</strong> prestado en este momento</p>
         {% endif %}

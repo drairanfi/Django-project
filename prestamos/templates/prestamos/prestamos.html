@@ -3,14 +3,14 @@
 {% block title %}Préstamos: {{ estado }}{% endblock %}
 
 {% block content %}
-    <div class="card">
+    <div>
         <h2>Préstamos en estado: {{ estado }}</h2>
         <p>
             <a href="{% url 'prestamos:prestamos_por_estado' 'activo' %}">Activos</a> |
             <a href="{% url 'prestamos:prestamos_por_estado' 'devuelto' %}">Devueltos</a> |
             <a href="{% url 'prestamos:prestamos_por_estado' 'vencido' %}">Vencidos</a>
         </p>
-        <table>
+        <table border="1">
             <tr>
                 <th>Libro</th>
                 <th>Lector</th>

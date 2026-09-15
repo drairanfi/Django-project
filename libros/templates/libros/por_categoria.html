@@ -3,7 +3,7 @@
 {% block title %}Categoría: {{ categoria.nombre }}{% endblock %}
 
 {% block content %}
-    <div class="card">
+    <div>
         <h2>Libros de {{ categoria.nombre }}</h2>
         <ul>
             {% for libro in libros %}
@@ -11,9 +11,9 @@
                     <a href="{% url 'libros:detalle_libro' libro.id %}">{{ libro.titulo }}</a>
                     - {{ libro.anio_publicacion }}
                     {% if libro.disponible %}
-                        <span class="tag">Disponible</span>
+                        (Disponible)
                     {% else %}
-                        <span class="tag">Prestado</span>
+                        (Prestado)
                     {% endif %}
                 </li>
             {% empty %}

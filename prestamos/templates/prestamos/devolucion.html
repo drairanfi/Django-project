@@ -3,10 +3,10 @@
 {% block title %}Devolución{% endblock %}
 
 {% block content %}
-    <div class="card">
+    <div>
         <h2>Devolución registrada</h2>
         <p>El libro <strong>{{ prestamo.libro.titulo }}</strong> fue devuelto por <strong>{{ prestamo.lector.nombre }}</strong>.</p>
         <p>Fecha de devolución: {{ prestamo.fecha_devolucion }}</p>
-        <a class="btn" href="{% url 'libros:detalle_libro' prestamo.libro.id %}">Volver al libro</a>
+        <a href="{% url 'libros:detalle_libro' prestamo.libro.id %}">Volver al libro</a>
     </div>
 {% endblock %}

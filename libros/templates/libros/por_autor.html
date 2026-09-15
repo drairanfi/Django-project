@@ -3,7 +3,7 @@
 {% block title %}Autor: {{ autor.nombre }} {{ autor.apellido }}{% endblock %}
 
 {% block content %}
-    <div class="card">
+    <div>
         <h2>{{ autor.nombre }} {{ autor.apellido }}</h2>
         <p><strong>Nacionalidad:</strong> {{ autor.nacionalidad|default:"No informada" }}</p>
         <h3>Libros de este autor</h3>

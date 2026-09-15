@@ -3,16 +3,16 @@
 {% block title %}{{ lector.nombre }}{% endblock %}
 
 {% block content %}
-    <div class="card">
+    <div>
         <h2>{{ lector.nombre }}</h2>
         <p><strong>Email:</strong> {{ lector.email }}</p>
         <p><strong>Teléfono:</strong> {{ lector.telefono|default:"No informado" }}</p>
         <p><strong>Registrado desde:</strong> {{ lector.fecha_registro }}</p>
     </div>
 
-    <div class="card">
+    <div>
         <h3>Historial de préstamos</h3>
-        <table>
+        <table border="1">
             <tr>
                 <th>Libro</th>
                 <th>Fecha</th>
