@@ -12,16 +12,17 @@ de libros, autores, categorías, lectores y el préstamo/devolución de ejemplar
 1. [Problemática identificada](#-problemática-identificada)
 2. [Solución propuesta](#-solución-propuesta)
 3. [Requisitos de la consigna y dónde se aplican](#-requisitos-de-la-consigna-y-dónde-se-aplican)
-4. [Arquitectura del proyecto](#-arquitectura-del-proyecto)
-5. [Modelos y relaciones](#-modelos-y-relaciones)
-6. [Vistas y rutas](#-vistas-y-rutas)
-7. [Funcionalidades](#-funcionalidades)
-8. [Cómo montar el proyecto desde cero](#-cómo-montar-el-proyecto-desde-cero)
-9. [Cómo ejecutar el proyecto](#-cómo-ejecutar-el-proyecto)
-10. [Datos de ejemplo](#-datos-de-ejemplo)
-11. [Panel de administración](#-panel-de-administración)
-12. [Tests](#-tests)
-13. [Tecnologías utilizadas](#-tecnologías-utilizadas)
+4. [El patrón vista → context → template](#-el-patrón-vista--context--template)
+5. [Arquitectura del proyecto](#-arquitectura-del-proyecto)
+6. [Modelos y relaciones](#-modelos-y-relaciones)
+7. [Vistas y rutas](#-vistas-y-rutas)
+8. [Funcionalidades](#-funcionalidades)
+9. [Cómo montar el proyecto desde cero](#-cómo-montar-el-proyecto-desde-cero)
+10. [Cómo ejecutar el proyecto](#-cómo-ejecutar-el-proyecto)
+11. [Datos de ejemplo](#-datos-de-ejemplo)
+12. [Panel de administración](#-panel-de-administración)
+13. [Tests](#-tests)
+14. [Tecnologías utilizadas](#-tecnologías-utilizadas)
 
 ---
 
@@ -59,7 +60,9 @@ Un sistema web que permite:
 |---|---|---|
 | **Múltiples vistas en una App** | `libros/views.py` → 4 vistas (`inicio`, `detalle_libro`, `libros_por_categoria`, `libros_por_autor`) — `prestamos/views.py` → 5 vistas (`lista_lectores`, `detalle_lector`, `prestamos_por_estado`, `registrar_devolucion`, `crear_prestamo`) | Ambas apps tienen **más de una vista** que responde por distintas URLs. |
 | **Múltiples Apps en un proyecto** | `biblioteca/settings.py` → `INSTALLED_APPS` incluye `'libros'` y `'prestamos'` | El proyecto se divide en **2 aplicaciones** con responsabilidades separadas. |
-| **Modelos consultados desde las vistas** | `libros/views.py:6-43` y `prestamos/views.py:10-79` usan `Libro.objects.all()`, `Libro.objects.filter(categoria=categoria)`, `get_object_or_404(...)` | Cada vista **consulta la base de datos** a través del ORM y pasa los resultados al template. |
+| **Modelos consultados desde las vistas** | `libros/views.py:6-53` y `prestamos/views.py:10-92` usan `Libro.objects.all()`, `Libro.objects.filter(categoria=categoria)`, `get_object_or_404(...)` | Cada vista **consulta la base de datos** a través del ORM y pasa los resultados al template. |
+| **Uso de shortcuts de Django** | Las 9 vistas usan `render(...)`; 7 usan `get_object_or_404(...)`. Cero `HttpResponse` crudo, cero `loader.get_template`, cero `raise Http404` manual | `render()` une template + context en una sola respuesta. `get_object_or_404()` evita el `try/except Model.DoesNotExist` a mano y devuelve un 404 real. |
+| **Patrón vista → context → template** | Las 9 vistas declaran una variable `context` explícita antes del `return render(...)` — ver [sección dedicada](#-el-patrón-vista--context--template) | La vista **consume el modelo**, arma un **diccionario `context`** y se lo **envía al template**. El template solo muestra: no consulta la base de datos. |
 | **Rutas dinámicas con parámetros y vistas que hacen algo con esa info** | `libros/urls.py:9-11` (`<int:libro_id>`, `<int:categoria_id>`, `<int:autor_id>`) y `prestamos/urls.py:9-12` (`<int:lector_id>`, `<str:estado>`, `<int:libro_id>`, `<int:prestamo_id>`) | Las URLs **capturan parámetros** y las vistas los reciben en su firma para filtrar datos, crear o actualizar registros. |
 
 ### Detalle: rutas dinámicas → cómo fluye la información
@@ -74,14 +77,14 @@ Un sistema web que permite:
 2. **La vista recibe el parámetro** como argumento:
 
    ```python
-   # prestamos/views.py:17
+   # prestamos/views.py:20
    def detalle_lector(request, lector_id):
    ```
 
 3. **La vista usa ese parámetro** para consultar la base de datos:
 
    ```python
-   # prestamos/views.py:18-20
+   # prestamos/views.py:22-23
    lector = get_object_or_404(Lector, pk=lector_id)
    prestamos = lector.prestamos.all()
    ```
@@ -100,6 +103,63 @@ Ejemplos de URLs que hacen algo con su parámetro:
 
 ---
 
+## 🔄 El patrón vista → context → template
+
+Este es el patrón central de Django y el que estructura **las 9 vistas** del proyecto.
+Siempre son los mismos tres pasos, en el mismo orden:
+
+```python
+# libros/views.py:32
+def libros_por_categoria(request, categoria_id):
+    """Busca la Categoría y filtra los Libros que le pertenecen."""
+
+    # 1. LA VISTA CONSUME EL MODELO (consulta la base de datos con el ORM)
+    categoria = get_object_or_404(Categoria, pk=categoria_id)
+    libros = Libro.objects.filter(categoria=categoria)
+
+    # 2. ARMA EL CONTEXT (un diccionario: "nombre en el template" -> dato)
+    context = {
+        "categoria": categoria,
+        "libros": libros,
+    }
+
+    # 3. SE LO ENVÍA AL TEMPLATE con el shortcut render()
+    return render(request, "libros/por_categoria.html", context)
+```
+
+Y del otro lado, el template **solo muestra** lo que recibió — no consulta nada:
+
+```html
+<!-- libros/templates/libros/por_categoria.html -->
+<h2>Libros de {{ categoria.nombre }}</h2>
+{% for libro in libros %}
+    <li>{{ libro.titulo }} - {{ libro.anio_publicacion }}</li>
+{% endfor %}
+```
+
+Las claves del `context` (`"categoria"`, `"libros"`) son **exactamente** los nombres
+que se usan entre llaves en el HTML. Ese diccionario es el contrato entre la vista y
+el template.
+
+### Los dos shortcuts que se usan
+
+| Shortcut | Qué reemplaza | Por qué se usa |
+|---|---|---|
+| `render(request, template, context)` | `HttpResponse(loader.get_template(...).render(context, request))` | Carga el template, lo renderiza con el context y devuelve el `HttpResponse`, todo en una línea. |
+| `get_object_or_404(Modelo, pk=id)` | `try: Modelo.objects.get(pk=id) / except Modelo.DoesNotExist: raise Http404` | Si el objeto no existe devuelve un **404 real** en vez de reventar con un error 500. |
+
+Comprobación de que el 404 funciona de verdad:
+
+```
+GET /libro/1/       → 200 OK
+GET /libro/99999/   → 404 Not Found   ← get_object_or_404 haciendo su trabajo
+```
+
+> **Nota sobre `prestamos_por_estado`:** es la única vista sin `get_object_or_404`, y es
+> a propósito. Ese shortcut sirve para buscar **un** objeto por su clave primaria; esta
+> vista filtra un *queryset* por un string de la URL. Que no haya préstamos en un estado
+> no es un error, es un resultado válido (una lista vacía).
+
 ## 🏗️ Arquitectura del proyecto
 
 ```
@@ -112,21 +172,21 @@ proyecto_django_biblioteca/
 │   └── __init__.py
 ├── libros/                    → App 1: catálogo de libros
 │   ├── models.py              → Autor, Categoria, Libro
-│   ├── views.py               → 4 vistas basadas en funciones
+│   ├── views.py               → 4 vistas basadas en funciones (patron context)
 │   ├── urls.py                → Rutas de la app libros
 │   ├── admin.py               → Registro de modelos en el admin
 │   ├── migrations/            → Migraciones de la app
 │   └── templates/libros/      → Plantillas HTML de la app
 ├── prestamos/                 → App 2: gestión de préstamos
 │   ├── models.py              → Lector, Prestamo
-│   ├── views.py               → 5 vistas basadas en funciones
+│   ├── views.py               → 5 vistas basadas en funciones (patron context)
 │   ├── urls.py                → Rutas de la app prestamos
 │   ├── admin.py               → Registro de modelos en el admin
 │   ├── tests.py               → Tests automáticos
 │   ├── migrations/            → Migraciones de la app
 │   └── templates/prestamos/   → Plantillas HTML de la app
 ├── templates/
-│   └── base.html              → Plantilla base con navegación y estilos
+│   └── base.html              → Plantilla base con la navegación comun
 ├── manage.py                  → Utilidad de línea de comandos de Django
 ├── seed.py                    → Script de carga de datos de ejemplo
 ├── db.sqlite3                 → Base de datos SQLite
@@ -194,19 +254,19 @@ Ese cambio de estado lo hace la **vista** (no el template), con `libro.save()`.
 | URL | Vista | Plantilla | Función |
 |---|---|---|---|
 | `/` | `inicio` (`libros/views.py:6`) | `inicio.html` | Lista todos los libros + disponibles + categorías |
-| `/libro/<int:libro_id>/` | `detalle_libro` (`libros/views.py:17`) | `detalle_libro.html` | Detalle del libro y sus préstamos activos |
-| `/categoria/<int:categoria_id>/` | `libros_por_categoria` (`libros/views.py:26`) | `por_categoria.html` | Libros filtrados por categoría |
-| `/autor/<int:autor_id>/` | `libros_por_autor` (`libros/views.py:35`) | `por_autor.html` | Libros filtrados por autor |
+| `/libro/<int:libro_id>/` | `detalle_libro` (`libros/views.py:20`) | `detalle_libro.html` | Detalle del libro y sus préstamos activos |
+| `/categoria/<int:categoria_id>/` | `libros_por_categoria` (`libros/views.py:32`) | `por_categoria.html` | Libros filtrados por categoría |
+| `/autor/<int:autor_id>/` | `libros_por_autor` (`libros/views.py:44`) | `por_autor.html` | Libros filtrados por autor |
 
 ### App `prestamos` (préstamos)
 
 | URL | Vista | Plantilla | Función |
 |---|---|---|---|
 | `/prestamos/lectores/` | `lista_lectores` (`prestamos/views.py:10`) | `lectores.html` | Lista todos los lectores y su cantidad de préstamos |
-| `/prestamos/lector/<int:lector_id>/` | `detalle_lector` (`prestamos/views.py:17`) | `detalle_lector.html` | Datos del lector + historial de préstamos |
-| `/prestamos/estado/<str:estado>/` | `prestamos_por_estado` (`prestamos/views.py:26`) | `prestamos.html` | Préstamos filtrados por estado |
-| `/prestamos/devolver/<int:prestamo_id>/` | `registrar_devolucion` (`prestamos/views.py:37`) | `devolucion.html` | Marca devuelto y libera el libro |
-| `/prestamos/prestar/<int:libro_id>/` | `crear_prestamo` (`prestamos/views.py:50`) | `crear_prestamo.html` | Registra un préstamo (GET = form, POST = guarda) |
+| `/prestamos/lector/<int:lector_id>/` | `detalle_lector` (`prestamos/views.py:20`) | `detalle_lector.html` | Datos del lector + historial de préstamos |
+| `/prestamos/estado/<str:estado>/` | `prestamos_por_estado` (`prestamos/views.py:32`) | `prestamos.html` | Préstamos filtrados por estado |
+| `/prestamos/devolver/<int:prestamo_id>/` | `registrar_devolucion` (`prestamos/views.py:47`) | `devolucion.html` | Marca devuelto y libera el libro |
+| `/prestamos/prestar/<int:libro_id>/` | `crear_prestamo` (`prestamos/views.py:65`) | `crear_prestamo.html` | Registra un préstamo (GET = form, POST = guarda) |
 
 Las URLs de las apps se incluyen en el enrutador principal:
 
@@ -224,8 +284,8 @@ path('prestamos/', include('prestamos.urls')),
    (Disponible / Prestado) y las categorías disponibles.
 2. **Ver detalle de un libro** — en `/libro/ID/` se muestra ISBN, año, páginas,
    categoría, autores y si tiene préstamos activos.
-3. **Filtrar por categoría** — desde `/categoria/ID/` (los tags de la home también
-   llevan ahí).
+3. **Filtrar por categoría** — desde `/categoria/ID/` (los enlaces de categoría de
+   la home también llevan ahí).
 4. **Filtrar por autor** — desde `/autor/ID/`, accesible desde el detalle de un libro.
 5. **Registrar un préstamo** — en `/prestar/ID/` se elige el lector en un formulario;
    al confirmar, el libro pasa a no disponible. Si el libro ya está prestado, avisa.
@@ -384,6 +444,16 @@ System check identified no issues (0 silenced).
 OK
 ```
 
+### Chequeo rápido sin correr el servidor
+
+Antes de entregar conviene validar que el proyecto no tiene errores de configuración:
+
+```bash
+python manage.py check
+```
+
+Salida esperada: `System check identified no issues (0 silenced).`
+
 ---
 
 ## 🧰 Tecnologías utilizadas
@@ -393,5 +463,5 @@ OK
 | Python | 3.14 | Lenguaje de programación |
 | Django | 6.1.1 | Framework web (ORM, URLs, vistas, templates, admin) |
 | SQLite | — | Base de datos (archivo `db.sqlite3`) |
-| HTML + CSS | — | Plantillas `base.html` y vistas |
+| HTML | — | Plantillas: `base.html` + una por vista, sin CSS ni JS |
 | Git / zip | — | Entrega del trabajo práctico |
