@@ -65,8 +65,9 @@ Credenciales del admin que crea el seed: `admin` / `admin123`.
 
 ### Smoke test de las vistas
 
-`ALLOWED_HOSTS` está vacío, así que el `Client` de tests falla con `DisallowedHost`
-si lo usás fuera de `manage.py test`. Para un smoke test manual hay que parchearlo:
+`ALLOWED_HOSTS` no incluye `testserver`, así que el `Client` de tests falla con
+`DisallowedHost` si lo usás fuera de `manage.py test`. Para un smoke test manual
+hay que parchearlo:
 
 ```python
 from django.conf import settings
@@ -147,9 +148,6 @@ microservicio_resenas/  SERVICIO 2 - la API de reseñas (FastAPI)
   main.py               endpoints, todos bajo /api
   requirements.txt      dependencias de la API
   schema.sql            tabla resenas en Supabase
-templates/         base.html (compartido)
-seed.py            carga de datos de ejemplo, idempotente con get_or_create
-README.md          documentación del TP
 ```
 
 Cada app tiene su `urls.py` con `app_name` definido y se incluye desde
@@ -224,3 +222,110 @@ Detalles que importan:
   definido. No hace falta build command.
 - Django deduce la URL de la API desde `VERCEL_URL`: comparten dominio, así que no
   hay que configurar nada.
+
+### Variables que hay que cargar en Vercel
+
+Settings → Environment Variables, las cinco, en Production, Preview y Development:
+
+| Variable | Valor |
+|---|---|
+| `DATABASE_URL` | connection string del **Session pooler** de Supabase |
+| `DJANGO_SECRET_KEY` | clave generada con `get_random_secret_key()` |
+| `DJANGO_DEBUG` | `False` |
+| `SUPABASE_URL` | Project URL de Supabase |
+| `SUPABASE_SERVICE_KEY` | la `service_role` key, no la `anon` |
+
+`MICROSERVICIO_RESENAS_URL` **no se carga**: Django la deduce del dominio del
+proyecto. Solo se define para apuntar a un servicio distinto.
+
+La connection string tiene que ser la del **Session pooler**
+(`aws-0-*.pooler.supabase.com`). La conexión directa (`db.*.supabase.co`) es
+IPv6 y Vercel no la alcanza: falla con un timeout que no dice nada.
+
+## Despliegue: problemas conocidos
+
+Esta sección existe porque cada uno de estos costó horas. Leela antes de
+diagnosticar un despliegue roto.
+
+### La URL no cambia pase lo que pase → mirá los alias, no el código
+
+**El síntoma más caro de todos.** Un build puede quedar `Ready` y aun así no
+servirse: los alias siguen apuntando al deployment anterior. La URL devuelve
+exactamente lo mismo aunque cambies el código veinte veces, porque estás viendo
+una versión vieja.
+
+```bash
+vercel alias ls | rg django-project      # ¿a qué deployment apuntan?
+vercel promote <url-del-deployment> --yes
+```
+
+Regla: **si algo no cambia _nunca_ después de varios intentos, dejá de mirar el
+código y fijate qué versión está sirviendo el servidor.**
+
+### Builds colgados en `Initializing`
+
+Los builds disparados por Git se cuelgan en `Initializing` de forma indefinida.
+Los lanzados por CLI arrancan en segundos.
+
+En el plan Hobby hay **un solo build concurrente**: uno trabado bloquea la cola
+entera y todo lo que pushees después queda en `Queued` sin construir. El mensaje
+es `Another build is in progress`.
+
+```bash
+vercel ls django-project                 # buscar Initializing o Queued
+vercel remove <url-trabada> --yes        # destrabar la cola
+vercel --prod --yes                      # desplegar por CLI
+```
+
+### El error real está en los logs de runtime, no en el HTTP
+
+`FUNCTION_INVOCATION_FAILED` con 500 en **todas** las rutas, incluida una que no
+toca la base ni la red, significa que el módulo explota **al importarse**. No es
+un problema de ninguna ruta en particular: casi siempre es una variable de
+entorno que falta.
+
+Desde afuera todos los 500 se ven iguales. Los logs de runtime del panel (o
+`vercel inspect <url>`) dicen la excepción exacta. Sin eso se diagnostica a
+ciegas y se pierden horas.
+
+### Qué archivo atiende cada ruta delata la configuración
+
+Si en los logs ves que `/` y `/libro/1/` los atiende `main.py`, el Root Directory
+del proyecto está mal: apunta a `microservicio_resenas` y Django ni se despliega.
+Con Services, el Root Directory del panel tiene que estar **vacío**, porque el
+`vercel.json` de la raíz es el que manda.
+
+Cuidado con la palabra "root", que significa dos cosas distintas:
+
+| Dónde | Valor |
+|---|---|
+| Panel de Vercel → Root Directory | **vacío** |
+| `vercel.json` → `services.sitio.root` | `sitio/` |
+| `vercel.json` → `services.api.root` | `microservicio_resenas/` |
+
+### `VERCEL_URL` está protegida, usá `VERCEL_PROJECT_PRODUCTION_URL`
+
+`VERCEL_URL` apunta al deployment concreto, que está detrás de Deployment
+Protection: pedirle JSON devuelve un 302 a la página de login SSO. La vista lo
+interpreta como servicio caído y muestra el aviso de degradación.
+
+`VERCEL_PROJECT_PRODUCTION_URL` es el dominio público y estable. Es la que usa
+`settings.py`.
+
+### El `.env` necesita comillas simples
+
+La `SECRET_KEY` de Django trae paréntesis y símbolos que rompen la shell al
+hacer `. ./.env`, con un `parse error` que no dice cuál es la línea. Todos los
+valores van entre comillas simples. En Vercel, en cambio, se pega el valor
+**sin** comillas.
+
+### No confíes en la documentación del repo sin verificarla
+
+Este archivo llegó a afirmar que `venv/` y `db.sqlite3` estaban versionados.
+Los dos eran falsos: el `.gitignore` los excluye. Antes de repetir lo que dice
+un doc, comprobalo:
+
+```bash
+git ls-files | wc -l
+git check-ignore -v venv db.sqlite3
+```
