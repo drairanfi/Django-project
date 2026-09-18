@@ -22,7 +22,8 @@ de libros, autores, categorías, lectores y el préstamo/devolución de ejemplar
 11. [Datos de ejemplo](#-datos-de-ejemplo)
 12. [Panel de administración](#-panel-de-administración)
 13. [Tests](#-tests)
-14. [Tecnologías utilizadas](#-tecnologías-utilizadas)
+14. [Microservicio externo de reseñas](#-microservicio-externo-de-reseñas)
+15. [Tecnologías utilizadas](#-tecnologías-utilizadas)
 
 ---
 
@@ -58,12 +59,13 @@ Un sistema web que permite:
 
 | Requisito | Dónde se cumple en el código | Explicación |
 |---|---|---|
-| **Múltiples vistas en una App** | `libros/views.py` → 4 vistas (`inicio`, `detalle_libro`, `libros_por_categoria`, `libros_por_autor`) — `prestamos/views.py` → 5 vistas (`lista_lectores`, `detalle_lector`, `prestamos_por_estado`, `registrar_devolucion`, `crear_prestamo`) | Ambas apps tienen **más de una vista** que responde por distintas URLs. |
+| **Múltiples vistas en una App** | `libros/views.py` → 5 vistas (`inicio`, `detalle_libro`, `libros_por_categoria`, `libros_por_autor`, `resenas_libro`) — `prestamos/views.py` → 5 vistas (`lista_lectores`, `detalle_lector`, `prestamos_por_estado`, `registrar_devolucion`, `crear_prestamo`) | Ambas apps tienen **más de una vista** que responde por distintas URLs. |
 | **Múltiples Apps en un proyecto** | `biblioteca/settings.py` → `INSTALLED_APPS` incluye `'libros'` y `'prestamos'` | El proyecto se divide en **2 aplicaciones** con responsabilidades separadas. |
 | **Modelos consultados desde las vistas** | `libros/views.py:6-53` y `prestamos/views.py:10-92` usan `Libro.objects.all()`, `Libro.objects.filter(categoria=categoria)`, `get_object_or_404(...)` | Cada vista **consulta la base de datos** a través del ORM y pasa los resultados al template. |
-| **Uso de shortcuts de Django** | Las 9 vistas usan `render(...)`; 7 usan `get_object_or_404(...)`. Cero `HttpResponse` crudo, cero `loader.get_template`, cero `raise Http404` manual | `render()` une template + context en una sola respuesta. `get_object_or_404()` evita el `try/except Model.DoesNotExist` a mano y devuelve un 404 real. |
-| **Patrón vista → context → template** | Las 9 vistas declaran una variable `context` explícita antes del `return render(...)` — ver [sección dedicada](#-el-patrón-vista--context--template) | La vista **consume el modelo**, arma un **diccionario `context`** y se lo **envía al template**. El template solo muestra: no consulta la base de datos. |
+| **Uso de shortcuts de Django** | Las 10 vistas usan `render(...)`; 7 usan `get_object_or_404(...)`. Cero `HttpResponse` crudo, cero `loader.get_template`, cero `raise Http404` manual | `render()` une template + context en una sola respuesta. `get_object_or_404()` evita el `try/except Model.DoesNotExist` a mano y devuelve un 404 real. |
+| **Patrón vista → context → template** | Las 10 vistas declaran una variable `context` explícita antes del `return render(...)` — ver [sección dedicada](#-el-patrón-vista--context--template) | La vista **consume el modelo**, arma un **diccionario `context`** y se lo **envía al template**. El template solo muestra: no consulta la base de datos. |
 | **Rutas dinámicas con parámetros y vistas que hacen algo con esa info** | `libros/urls.py:9-11` (`<int:libro_id>`, `<int:categoria_id>`, `<int:autor_id>`) y `prestamos/urls.py:9-12` (`<int:lector_id>`, `<str:estado>`, `<int:libro_id>`, `<int:prestamo_id>`) | Las URLs **capturan parámetros** y las vistas los reciben en su firma para filtrar datos, crear o actualizar registros. |
+| **Una vista consume un microservicio propio en la nube, sobre una base distinta de SQLite** | `libros/views.py:58` → `resenas_libro()` llama por HTTP a `microservicio_resenas/` (FastAPI en Render) a través del cliente `libros/servicios.py` — ver [sección dedicada](#-microservicio-externo-de-reseñas) | Las reseñas viven en **Supabase (PostgreSQL)**, no en `db.sqlite3`. Django no tiene credenciales de esa base: solo conoce una URL HTTP. |
 
 ### Detalle: rutas dinámicas → cómo fluye la información
 
@@ -109,7 +111,7 @@ Este es el patrón central de Django y el que estructura **las 9 vistas** del pr
 Siempre son los mismos tres pasos, en el mismo orden:
 
 ```python
-# libros/views.py:32
+# libros/views.py:34
 def libros_por_categoria(request, categoria_id):
     """Busca la Categoría y filtra los Libros que le pertenecen."""
 
@@ -253,10 +255,11 @@ Ese cambio de estado lo hace la **vista** (no el template), con `libro.save()`.
 
 | URL | Vista | Plantilla | Función |
 |---|---|---|---|
-| `/` | `inicio` (`libros/views.py:6`) | `inicio.html` | Lista todos los libros + disponibles + categorías |
-| `/libro/<int:libro_id>/` | `detalle_libro` (`libros/views.py:20`) | `detalle_libro.html` | Detalle del libro y sus préstamos activos |
-| `/categoria/<int:categoria_id>/` | `libros_por_categoria` (`libros/views.py:32`) | `por_categoria.html` | Libros filtrados por categoría |
-| `/autor/<int:autor_id>/` | `libros_por_autor` (`libros/views.py:44`) | `por_autor.html` | Libros filtrados por autor |
+| `/` | `inicio` (`libros/views.py:8`) | `inicio.html` | Lista todos los libros + disponibles + categorías |
+| `/libro/<int:libro_id>/` | `detalle_libro` (`libros/views.py:22`) | `detalle_libro.html` | Detalle del libro y sus préstamos activos |
+| `/categoria/<int:categoria_id>/` | `libros_por_categoria` (`libros/views.py:34`) | `por_categoria.html` | Libros filtrados por categoría |
+| `/autor/<int:autor_id>/` | `libros_por_autor` (`libros/views.py:46`) | `por_autor.html` | Libros filtrados por autor |
+| `/libro/<int:libro_id>/resenas/` | `resenas_libro` (`libros/views.py:58`) | `resenas.html` | Reseñas del libro traídas del **microservicio externo** |
 
 ### App `prestamos` (préstamos)
 
@@ -422,13 +425,15 @@ Con `admin` / `admin123` (o el superusuario que crees) podés entrar a
 
 ## 🧪 Tests
 
-El proyecto incluye tests automáticos en `prestamos/tests.py`:
+El proyecto incluye tests automáticos en `prestamos/tests.py` y `libros/tests.py`:
 
 | Test | Qué verifica |
 |---|---|
 | `test_detalle_libro_muestra_datos` | La vista `/libro/ID/` responde 200 y muestra el título |
 | `test_filtrar_por_categoria` | La vista `/categoria/ID/` responde 200 y muestra el libro |
 | `test_prestar_y_devolver` | El flujo completo: prestar → libro no disponible → devolver → libro disponible |
+| `test_muestra_las_resenas_que_devuelve_el_microservicio` | La vista de reseñas renderiza lo que responde el servicio externo |
+| `test_si_el_microservicio_no_responde_la_pagina_igual_carga` | Si el microservicio falla, la vista responde 200 con un aviso — nunca un 500 |
 
 Para correrlos:
 
@@ -439,10 +444,14 @@ python manage.py test
 Salida esperada:
 
 ```
-Found 3 test(s).
+Found 5 test(s).
 System check identified no issues (0 silenced).
 OK
 ```
+
+Los dos tests de reseñas usan `unittest.mock.patch` sobre `libros.servicios`:
+**no hacen llamadas de red reales**. Un test que dependa de un servicio remoto
+falla cuando se cae internet, y eso no es una falla del código.
 
 ### Chequeo rápido sin correr el servidor
 
@@ -456,12 +465,133 @@ Salida esperada: `System check identified no issues (0 silenced).`
 
 ---
 
+## 🌐 Microservicio externo de reseñas
+
+Las reseñas de los libros **no están en SQLite**. Viven en un microservicio
+propio, escrito en FastAPI, desplegado en **Render**, que guarda los datos en
+**Supabase** (PostgreSQL administrado). Django los consume por HTTP.
+
+```
+Navegador
+   │
+   ▼
+Django (SQLite, local)
+   │  Libro, Autor, Categoria, Prestamo  ──► ORM ──► db.sqlite3
+   │
+   └─ vista resenas_libro() ──HTTP GET──► microservicio-resenas (Render)
+                                              │
+                                              └── tabla resenas ──► Supabase (PostgreSQL)
+```
+
+El código del servicio está en [`microservicio_resenas/`](microservicio_resenas/),
+con sus pasos de despliegue en [su README](microservicio_resenas/README.md).
+
+### Quién habla con quién
+
+| Dato | Dónde vive | Cómo lo obtiene Django |
+|---|---|---|
+| Libros, autores, categorías, préstamos | SQLite local | ORM de Django |
+| Reseñas y puntajes | Supabase (nube) | HTTP contra el microservicio |
+
+Django **no** tiene credenciales de Supabase ni conoce su esquema. Solo conoce
+una URL. Si mañana el microservicio cambia Postgres por otra base, Django no se
+entera.
+
+### Las tres capas del lado Django
+
+1. **`libros/servicios.py`** — el cliente HTTP. Único módulo que sabe que las
+   reseñas son remotas. Usa `urllib` de la biblioteca estándar, así que el
+   proyecto sigue sin dependencias externas. Traduce cualquier falla de red a
+   una excepción propia, `MicroservicioNoDisponible`.
+2. **`libros/views.py` → `resenas_libro()`** — la vista. Mismo patrón de
+   siempre: consume datos, arma el `context`, lo manda al template. La
+   diferencia es que consume dos fuentes: el ORM para el `Libro` y el
+   microservicio para las reseñas.
+3. **`libros/templates/libros/resenas.html`** — el template. No sabe de dónde
+   salieron los datos: recibe una lista en el context, como cualquier otra vista.
+
+```python
+# libros/views.py:58
+def resenas_libro(request, libro_id):
+    """Combina un Libro del ORM con sus reseñas traídas del microservicio externo."""
+    libro = get_object_or_404(Libro, pk=libro_id)     # ← base local
+    ...
+    try:
+        datos = servicios.obtener_resenas(libro.id)   # ← servicio remoto
+        error = ""
+    except servicios.MicroservicioNoDisponible as fallo:
+        datos = {}
+        error = f"El microservicio de reseñas no está disponible ({fallo})"
+```
+
+### Por qué el `try/except` no es opcional
+
+Una consulta al ORM local falla casi solo si hay un bug. Una llamada HTTP a otra
+máquina falla por motivos que no controlás: se cayó la red, Render durmió el
+servicio, Supabase está lento, cambió la URL. **Toda llamada remota se asume
+falible.** Si el microservicio no responde, la página se sigue mostrando con un
+aviso; no devuelve un error 500. Eso es *degradación controlada*, y es la
+diferencia práctica entre leer de una base local y leer de un servicio externo.
+
+Por lo mismo hay un **timeout** de 5 segundos: sin timeout, una vista queda
+colgada esperando a un servidor que quizá nunca conteste.
+
+### Configuración
+
+```python
+# biblioteca/settings.py
+MICROSERVICIO_RESENAS_URL = os.environ.get(
+    'MICROSERVICIO_RESENAS_URL',
+    'http://127.0.0.1:8001',
+).rstrip('/')
+
+MICROSERVICIO_RESENAS_TIMEOUT = 5  # segundos
+```
+
+La URL se lee de una variable de entorno. En local apunta al servicio corriendo
+en el puerto 8001; en la entrega apunta a Render:
+
+```bash
+export MICROSERVICIO_RESENAS_URL="https://microservicio-resenas.onrender.com"
+venv/bin/python manage.py runserver
+```
+
+### Endpoint que se consume
+
+`GET /libros/{libro_id}/resenas` devuelve:
+
+```json
+{
+  "libro_id": 1,
+  "cantidad": 2,
+  "promedio": 4.5,
+  "resenas": [
+    {"id": 1, "libro_id": 1, "lector": "Ana Gómez", "puntaje": 5,
+     "comentario": "Imperdible.", "creada_en": "2026-09-18T10:00:00+00:00"}
+  ]
+}
+```
+
+El formulario de la página también hace `POST /resenas` contra el mismo
+servicio: la reseña se escribe en Supabase, nunca en SQLite.
+
+### Nota sobre el plan free de Render
+
+El servicio se duerme tras 15 minutos sin tráfico y el primer request puede
+tardar ~30-50 segundos en despertarlo — más que el timeout de 5 segundos. Antes
+de mostrar el proyecto, abrí la URL del microservicio una vez para despertarlo.
+
+---
+
 ## 🧰 Tecnologías utilizadas
 
 | Tecnología | Versión | Uso |
 |---|---|---|
 | Python | 3.14 | Lenguaje de programación |
 | Django | 6.1.1 | Framework web (ORM, URLs, vistas, templates, admin) |
-| SQLite | — | Base de datos (archivo `db.sqlite3`) |
+| SQLite | — | Base de datos local de Django (archivo `db.sqlite3`) |
+| FastAPI | 0.141.1 | Microservicio de reseñas (repo: `microservicio_resenas/`) |
+| Supabase | — | PostgreSQL en la nube, base del microservicio |
+| Render | — | Hosting del microservicio |
 | HTML | — | Plantillas: `base.html` + una por vista, sin CSS ni JS |
 | Git / zip | — | Entrega del trabajo práctico |

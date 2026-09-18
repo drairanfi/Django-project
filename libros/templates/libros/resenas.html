@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}Reseñas de {{ libro.titulo }}{% endblock %}
+
+{% block content %}
+    <h2>Reseñas de {{ libro.titulo }}</h2>
+    <p>
+        Datos servidos por el microservicio externo:
+        <code>{{ url_microservicio }}</code>
+    </p>
+
+    {% if error %}
+        <p><strong>{{ error }}</strong></p>
+    {% endif %}
+
+    {% if mensaje %}
+        <p><strong>{{ mensaje }}</strong></p>
+    {% endif %}
+
+    <p><strong>Cantidad de reseñas:</strong> {{ cantidad }}</p>
+    <p><strong>Puntaje promedio:</strong> {{ promedio|default:"sin datos" }}</p>
+
+    {% if resenas %}
+        <table border="1">
+            <tr>
+                <th>Lector</th>
+                <th>Puntaje</th>
+                <th>Comentario</th>
+                <th>Fecha</th>
+            </tr>
+            {% for resena in resenas %}
+                <tr>
+                    <td>{{ resena.lector }}</td>
+                    <td>{{ resena.puntaje }}</td>
+                    <td>{{ resena.comentario }}</td>
+                    <td>{{ resena.creada_en }}</td>
+                </tr>
+            {% endfor %}
+        </table>
+    {% else %}
+        <p>Este libro todavía no tiene reseñas.</p>
+    {% endif %}
+
+    <hr>
+
+    <h3>Dejar una reseña</h3>
+    <form method="post">
+        {% csrf_token %}
+        <p>
+            <label for="lector">Tu nombre:</label>
+            <input type="text" id="lector" name="lector" required>
+        </p>
+        <p>
+            <label for="puntaje">Puntaje:</label>
+            <select id="puntaje" name="puntaje">
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5" selected>5</option>
+            </select>
+        </p>
+        <p>
+            <label for="comentario">Comentario:</label>
+            <textarea id="comentario" name="comentario" rows="3" cols="40"></textarea>
+        </p>
+        <button type="submit">Enviar al microservicio</button>
+    </form>
+
+    <hr>
+    <p><a href="{% url 'libros:detalle_libro' libro.id %}">Volver al libro</a></p>
+{% endblock %}

@@ -17,6 +17,7 @@
             {% endfor %}
         </p>
         <p><strong>Préstamos activos:</strong> {{ prestamos_activos }}</p>
+        <p><a href="{% url 'libros:resenas_libro' libro.id %}">Ver reseñas (microservicio externo)</a></p>
 
         {% if libro.disponible %}
             <a href="{% url 'prestamos:crear_prestamo' libro.id %}">Prestar este libro</a>

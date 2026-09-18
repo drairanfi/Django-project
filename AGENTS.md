@@ -19,10 +19,16 @@ un código peor para este repo.
 | Python | 3.14.7 |
 | Django | 6.1.1 |
 | Base de datos | SQLite (`db.sqlite3`, versionada) |
+| Microservicio | FastAPI + Supabase, en `microservicio_resenas/` (deps propias) |
 
 Sin dependencias externas más allá de Django. Sin CSS, sin JavaScript, sin frontend
 build. **No agregues librerías** (ni `requirements.txt` con extras, ni Bootstrap, ni
-Tailwind, ni HTMX) salvo pedido explícito.
+Tailwind, ni HTMX) salvo pedido explícito. Las llamadas HTTP salientes usan `urllib`
+de la biblioteca estándar, no `requests`.
+
+`microservicio_resenas/` es la excepción: es un servicio aparte, con su propio
+`requirements.txt` y su propio ciclo de vida. Sus dependencias NO se instalan en el
+`venv/` de Django.
 
 ## Comandos
 
@@ -30,7 +36,7 @@ El entorno virtual vive en `venv/` y está versionado. Usá su intérprete direc
 
 ```bash
 venv/bin/python manage.py check          # validar configuración
-venv/bin/python manage.py test           # correr los 3 tests
+venv/bin/python manage.py test           # correr los 5 tests
 venv/bin/python manage.py runserver      # levantar en http://127.0.0.1:8000/
 venv/bin/python manage.py makemigrations # tras tocar models.py
 venv/bin/python manage.py migrate
@@ -111,6 +117,7 @@ Se eliminó deliberadamente todo el CSS para que el proyecto se vea básico.
 biblioteca/        configuración del proyecto (settings, urls raíz)
 libros/            app 1: Autor, Categoria, Libro → 4 vistas
 prestamos/         app 2: Lector, Prestamo → 5 vistas
+microservicio_resenas/  servicio aparte: FastAPI + Supabase, se despliega en Render
 templates/         base.html (compartido)
 seed.py            carga de datos de ejemplo, idempotente con get_or_create
 README.md          documentación del TP
@@ -127,3 +134,22 @@ Cada app tiene su `urls.py` con `app_name` definido y se incluye desde
    en las tablas de "Requisitos de la consigna" y "Vistas y rutas".
 3. Si tocás `models.py`, generá la migración en el mismo cambio.
 4. Commits en español, formato conventional commits (`feat:`, `fix:`, `docs:`).
+
+## Microservicio de reseñas
+
+Las reseñas NO son un modelo de Django. Viven en Supabase y se leen por HTTP
+desde `microservicio_resenas/`, desplegado en Render.
+
+Reglas:
+
+- **No crees un modelo `Resena` en Django.** El punto del ejercicio es que ese
+  dato viva fuera de SQLite.
+- Toda llamada HTTP pasa por `libros/servicios.py`. Las vistas no arman URLs ni
+  parsean JSON: llaman a una función del módulo de servicios.
+- Toda llamada remota va envuelta en `try/except MicroservicioNoDisponible` y
+  con timeout. Si el servicio se cae, la vista muestra un aviso, nunca un 500.
+- Las credenciales de Supabase viven solo en variables de entorno del
+  microservicio. Django no las conoce: solo conoce `MICROSERVICIO_RESENAS_URL`.
+
+Para trabajar en local hay que levantar el microservicio en el puerto 8001
+(ver `microservicio_resenas/README.md`).

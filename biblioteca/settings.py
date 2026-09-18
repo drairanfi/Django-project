@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.1/ref/settings/
 """
 
+import os
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -127,3 +128,15 @@ MAILERS = {
         'BACKEND': 'django.core.mail.backends.console.EmailBackend',
     },
 }
+
+
+# Microservicio externo de reseñas
+# Servicio propio (FastAPI + Supabase) desplegado en Render. Django no accede a
+# esa base de datos: la consume por HTTP. En local se levanta en el puerto 8001.
+
+MICROSERVICIO_RESENAS_URL = os.environ.get(
+    'MICROSERVICIO_RESENAS_URL',
+    'http://127.0.0.1:8001',
+).rstrip('/')
+
+MICROSERVICIO_RESENAS_TIMEOUT = 5  # segundos
