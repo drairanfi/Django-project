@@ -11,9 +11,23 @@ from supabase import Client, create_client
 
 TABLA = "resenas"
 
+def variable_obligatoria(nombre):
+    """Lee una variable de entorno obligatoria y falla con un mensaje legible si falta."""
+    valor = os.environ.get(nombre)
+    if not valor:
+        raise RuntimeError(
+            f"Falta la variable de entorno {nombre}. "
+            "Cargala en el panel de la plataforma de despliegue, "
+            "o en el archivo .env si estás corriendo local."
+        )
+    return valor
+
+
 # Las credenciales llegan por variables de entorno. Nunca se escriben en el código.
-SUPABASE_URL = os.environ["SUPABASE_URL"]
-SUPABASE_SERVICE_KEY = os.environ["SUPABASE_SERVICE_KEY"]
+# Si falta alguna, el servicio no arranca: es preferible fallar al inicio y no
+# en medio de un request.
+SUPABASE_URL = variable_obligatoria("SUPABASE_URL")
+SUPABASE_SERVICE_KEY = variable_obligatoria("SUPABASE_SERVICE_KEY")
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
