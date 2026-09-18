@@ -1,0 +1,19 @@
+# Blueprint de Render para el microservicio de reseñas.
+# El servicio vive en microservicio_resenas/, no en la raíz del repo.
+services:
+  - type: web
+    name: microservicio-resenas
+    runtime: python
+    plan: free
+    region: oregon
+    rootDir: microservicio_resenas
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /salud
+    envVars:
+      # sync: false -> Render pide el valor al crear el servicio y lo guarda
+      # cifrado. Las credenciales nunca se versionan.
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
