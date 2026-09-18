@@ -59,34 +59,34 @@ Un sistema web que permite:
 
 | Requisito | Dónde se cumple en el código | Explicación |
 |---|---|---|
-| **Múltiples vistas en una App** | `libros/views.py` → 5 vistas (`inicio`, `detalle_libro`, `libros_por_categoria`, `libros_por_autor`, `resenas_libro`) — `prestamos/views.py` → 5 vistas (`lista_lectores`, `detalle_lector`, `prestamos_por_estado`, `registrar_devolucion`, `crear_prestamo`) | Ambas apps tienen **más de una vista** que responde por distintas URLs. |
-| **Múltiples Apps en un proyecto** | `biblioteca/settings.py` → `INSTALLED_APPS` incluye `'libros'` y `'prestamos'` | El proyecto se divide en **2 aplicaciones** con responsabilidades separadas. |
-| **Modelos consultados desde las vistas** | `libros/views.py:6-53` y `prestamos/views.py:10-92` usan `Libro.objects.all()`, `Libro.objects.filter(categoria=categoria)`, `get_object_or_404(...)` | Cada vista **consulta la base de datos** a través del ORM y pasa los resultados al template. |
+| **Múltiples vistas en una App** | `sitio/libros/views.py` → 5 vistas (`inicio`, `detalle_libro`, `libros_por_categoria`, `libros_por_autor`, `resenas_libro`) — `sitio/prestamos/views.py` → 5 vistas (`lista_lectores`, `detalle_lector`, `prestamos_por_estado`, `registrar_devolucion`, `crear_prestamo`) | Ambas apps tienen **más de una vista** que responde por distintas URLs. |
+| **Múltiples Apps en un proyecto** | `sitio/biblioteca/settings.py` → `INSTALLED_APPS` incluye `'libros'` y `'prestamos'` | El proyecto se divide en **2 aplicaciones** con responsabilidades separadas. |
+| **Modelos consultados desde las vistas** | `sitio/libros/views.py:6-53` y `sitio/prestamos/views.py:10-92` usan `Libro.objects.all()`, `Libro.objects.filter(categoria=categoria)`, `get_object_or_404(...)` | Cada vista **consulta la base de datos** a través del ORM y pasa los resultados al template. |
 | **Uso de shortcuts de Django** | Las 10 vistas usan `render(...)`; 7 usan `get_object_or_404(...)`. Cero `HttpResponse` crudo, cero `loader.get_template`, cero `raise Http404` manual | `render()` une template + context en una sola respuesta. `get_object_or_404()` evita el `try/except Model.DoesNotExist` a mano y devuelve un 404 real. |
 | **Patrón vista → context → template** | Las 10 vistas declaran una variable `context` explícita antes del `return render(...)` — ver [sección dedicada](#-el-patrón-vista--context--template) | La vista **consume el modelo**, arma un **diccionario `context`** y se lo **envía al template**. El template solo muestra: no consulta la base de datos. |
-| **Rutas dinámicas con parámetros y vistas que hacen algo con esa info** | `libros/urls.py:9-11` (`<int:libro_id>`, `<int:categoria_id>`, `<int:autor_id>`) y `prestamos/urls.py:9-12` (`<int:lector_id>`, `<str:estado>`, `<int:libro_id>`, `<int:prestamo_id>`) | Las URLs **capturan parámetros** y las vistas los reciben en su firma para filtrar datos, crear o actualizar registros. |
-| **Una vista consume un microservicio propio en la nube, sobre una base distinta de SQLite** | `libros/views.py:58` → `resenas_libro()` llama por HTTP a `microservicio_resenas/` (FastAPI en Vercel) a través del cliente `libros/servicios.py` — ver [sección dedicada](#-microservicio-externo-de-reseñas) | Las reseñas viven en **Supabase (PostgreSQL)**, no en `db.sqlite3`. Django no tiene credenciales de esa base: solo conoce una URL HTTP. |
+| **Rutas dinámicas con parámetros y vistas que hacen algo con esa info** | `sitio/libros/urls.py:9-11` (`<int:libro_id>`, `<int:categoria_id>`, `<int:autor_id>`) y `sitio/prestamos/urls.py:9-12` (`<int:lector_id>`, `<str:estado>`, `<int:libro_id>`, `<int:prestamo_id>`) | Las URLs **capturan parámetros** y las vistas los reciben en su firma para filtrar datos, crear o actualizar registros. |
+| **Una vista consume un microservicio propio en la nube, sobre una base distinta de SQLite** | `sitio/libros/views.py:58` → `resenas_libro()` llama por HTTP a `microservicio_resenas/` (FastAPI en Vercel) a través del cliente `sitio/libros/servicios.py` — ver [sección dedicada](#-microservicio-externo-de-reseñas) | Las reseñas viven en **Supabase (PostgreSQL)**, no en `db.sqlite3`. Django no tiene credenciales de esa base: solo conoce una URL HTTP. |
 
 ### Detalle: rutas dinámicas → cómo fluye la información
 
 1. **La URL captura el parámetro** (con `path`):
 
    ```python
-   # prestamos/urls.py:9
+   # sitio/prestamos/urls.py:9
    path("lector/<int:lector_id>/", views.detalle_lector, name="detalle_lector"),
    ```
 
 2. **La vista recibe el parámetro** como argumento:
 
    ```python
-   # prestamos/views.py:20
+   # sitio/prestamos/views.py:20
    def detalle_lector(request, lector_id):
    ```
 
 3. **La vista usa ese parámetro** para consultar la base de datos:
 
    ```python
-   # prestamos/views.py:22-23
+   # sitio/prestamos/views.py:22-23
    lector = get_object_or_404(Lector, pk=lector_id)
    prestamos = lector.prestamos.all()
    ```
@@ -111,7 +111,7 @@ Este es el patrón central de Django y el que estructura **las 9 vistas** del pr
 Siempre son los mismos tres pasos, en el mismo orden:
 
 ```python
-# libros/views.py:34
+# sitio/libros/views.py:34
 def libros_por_categoria(request, categoria_id):
     """Busca la Categoría y filtra los Libros que le pertenecen."""
 
@@ -233,7 +233,7 @@ biblioteca/urls.py  ── include('libros.urls') ──►  libros/urls.py
 | **Prestamo** | `fecha_prestamo`, `fecha_devolucion`, `estado` | `lector` → ForeignKey a `Lector` · `libro` → ForeignKey a `Libro` |
 
 ```python
-# prestamos/models.py:20-28
+# sitio/prestamos/models.py:20-28
 class Prestamo(models.Model):
     ESTADO_CHOICES = [("activo", "Activo"), ("devuelto", "Devuelto"), ("vencido", "Vencido")]
     lector = models.ForeignKey(Lector, on_delete=models.CASCADE, related_name="prestamos")
@@ -255,26 +255,26 @@ Ese cambio de estado lo hace la **vista** (no el template), con `libro.save()`.
 
 | URL | Vista | Plantilla | Función |
 |---|---|---|---|
-| `/` | `inicio` (`libros/views.py:8`) | `inicio.html` | Lista todos los libros + disponibles + categorías |
-| `/libro/<int:libro_id>/` | `detalle_libro` (`libros/views.py:22`) | `detalle_libro.html` | Detalle del libro y sus préstamos activos |
-| `/categoria/<int:categoria_id>/` | `libros_por_categoria` (`libros/views.py:34`) | `por_categoria.html` | Libros filtrados por categoría |
-| `/autor/<int:autor_id>/` | `libros_por_autor` (`libros/views.py:46`) | `por_autor.html` | Libros filtrados por autor |
-| `/libro/<int:libro_id>/resenas/` | `resenas_libro` (`libros/views.py:58`) | `resenas.html` | Reseñas del libro traídas del **microservicio externo** |
+| `/` | `inicio` (`sitio/libros/views.py:8`) | `inicio.html` | Lista todos los libros + disponibles + categorías |
+| `/libro/<int:libro_id>/` | `detalle_libro` (`sitio/libros/views.py:22`) | `detalle_libro.html` | Detalle del libro y sus préstamos activos |
+| `/categoria/<int:categoria_id>/` | `libros_por_categoria` (`sitio/libros/views.py:34`) | `por_categoria.html` | Libros filtrados por categoría |
+| `/autor/<int:autor_id>/` | `libros_por_autor` (`sitio/libros/views.py:46`) | `por_autor.html` | Libros filtrados por autor |
+| `/libro/<int:libro_id>/resenas/` | `resenas_libro` (`sitio/libros/views.py:58`) | `resenas.html` | Reseñas del libro traídas del **microservicio externo** |
 
 ### App `prestamos` (préstamos)
 
 | URL | Vista | Plantilla | Función |
 |---|---|---|---|
-| `/prestamos/lectores/` | `lista_lectores` (`prestamos/views.py:10`) | `lectores.html` | Lista todos los lectores y su cantidad de préstamos |
-| `/prestamos/lector/<int:lector_id>/` | `detalle_lector` (`prestamos/views.py:20`) | `detalle_lector.html` | Datos del lector + historial de préstamos |
-| `/prestamos/estado/<str:estado>/` | `prestamos_por_estado` (`prestamos/views.py:32`) | `prestamos.html` | Préstamos filtrados por estado |
-| `/prestamos/devolver/<int:prestamo_id>/` | `registrar_devolucion` (`prestamos/views.py:47`) | `devolucion.html` | Marca devuelto y libera el libro |
-| `/prestamos/prestar/<int:libro_id>/` | `crear_prestamo` (`prestamos/views.py:65`) | `crear_prestamo.html` | Registra un préstamo (GET = form, POST = guarda) |
+| `/prestamos/lectores/` | `lista_lectores` (`sitio/prestamos/views.py:10`) | `lectores.html` | Lista todos los lectores y su cantidad de préstamos |
+| `/prestamos/lector/<int:lector_id>/` | `detalle_lector` (`sitio/prestamos/views.py:20`) | `detalle_lector.html` | Datos del lector + historial de préstamos |
+| `/prestamos/estado/<str:estado>/` | `prestamos_por_estado` (`sitio/prestamos/views.py:32`) | `prestamos.html` | Préstamos filtrados por estado |
+| `/prestamos/devolver/<int:prestamo_id>/` | `registrar_devolucion` (`sitio/prestamos/views.py:47`) | `devolucion.html` | Marca devuelto y libera el libro |
+| `/prestamos/prestar/<int:libro_id>/` | `crear_prestamo` (`sitio/prestamos/views.py:65`) | `crear_prestamo.html` | Registra un préstamo (GET = form, POST = guarda) |
 
 Las URLs de las apps se incluyen en el enrutador principal:
 
 ```python
-# biblioteca/urls.py:22-23
+# sitio/biblioteca/urls.py:22-23
 path('', include('libros.urls')),
 path('prestamos/', include('prestamos.urls')),
 ```
@@ -343,7 +343,7 @@ python manage.py startapp libros
 python manage.py startapp prestamos
 ```
 
-### 5. Registrar las apps en `biblioteca/settings.py`
+### 5. Registrar las apps en `sitio/biblioteca/settings.py`
 
 Agregar al final de `INSTALLED_APPS`:
 
@@ -392,7 +392,7 @@ Abrir en el navegador:
 
 ## 📊 Datos de ejemplo
 
-El script `seed.py` carga:
+El script `sitio/seed.py` carga:
 
 - **3 categorías**: Ficción, Ciencia, Historia
 - **3 autores**: Jorge Luis Borges, Julio Verne, Stephen Hawking
@@ -425,7 +425,7 @@ Con `admin` / `admin123` (o el superusuario que crees) podés entrar a
 
 ## 🧪 Tests
 
-El proyecto incluye tests automáticos en `prestamos/tests.py` y `libros/tests.py`:
+El proyecto incluye tests automáticos en `sitio/prestamos/tests.py` y `sitio/libros/tests.py`:
 
 | Test | Qué verifica |
 |---|---|
@@ -478,7 +478,7 @@ Navegador
 Django (SQLite, local)
    │  Libro, Autor, Categoria, Prestamo  ──► ORM ──► db.sqlite3
    │
-   └─ vista resenas_libro() ──HTTP GET──► microservicio-resenas (Vercel)
+   └─ vista resenas_libro() ──HTTP GET──► servicio api, en /api
                                               │
                                               └── tabla resenas ──► Supabase (PostgreSQL)
 ```
@@ -499,19 +499,19 @@ entera.
 
 ### Las tres capas del lado Django
 
-1. **`libros/servicios.py`** — el cliente HTTP. Único módulo que sabe que las
+1. **`sitio/libros/servicios.py`** — el cliente HTTP. Único módulo que sabe que las
    reseñas son remotas. Usa `urllib` de la biblioteca estándar, así que el
    proyecto sigue sin dependencias externas. Traduce cualquier falla de red a
    una excepción propia, `MicroservicioNoDisponible`.
-2. **`libros/views.py` → `resenas_libro()`** — la vista. Mismo patrón de
+2. **`sitio/libros/views.py` → `resenas_libro()`** — la vista. Mismo patrón de
    siempre: consume datos, arma el `context`, lo manda al template. La
    diferencia es que consume dos fuentes: el ORM para el `Libro` y el
    microservicio para las reseñas.
-3. **`libros/templates/libros/resenas.html`** — el template. No sabe de dónde
+3. **`sitio/libros/templates/libros/resenas.html`** — el template. No sabe de dónde
    salieron los datos: recibe una lista en el context, como cualquier otra vista.
 
 ```python
-# libros/views.py:58
+# sitio/libros/views.py:58
 def resenas_libro(request, libro_id):
     """Combina un Libro del ORM con sus reseñas traídas del microservicio externo."""
     libro = get_object_or_404(Libro, pk=libro_id)     # ← base local
@@ -539,7 +539,7 @@ colgada esperando a un servidor que quizá nunca conteste.
 ### Configuración
 
 ```python
-# biblioteca/settings.py
+# sitio/biblioteca/settings.py
 MICROSERVICIO_RESENAS_URL = os.environ.get(
     'MICROSERVICIO_RESENAS_URL',
     'http://127.0.0.1:8001',
@@ -575,16 +575,45 @@ venv/bin/python manage.py runserver
 El formulario de la página también hace `POST /resenas` contra el mismo
 servicio: la reseña se escribe en Supabase, nunca en SQLite.
 
-### Nota sobre el despliegue
+### Un solo despliegue, un solo dominio
 
-El proyecto de Vercel tiene que apuntar a la carpeta `microservicio_resenas/`
-(**Root Directory**), no a la raíz del repositorio. En la raíz está `manage.py`,
-y si Vercel lo detecta intenta desplegar Django —que no se despliega, corre
-local contra SQLite— y el build falla.
+El sitio y la API son dos aplicaciones distintas, pero viven en **un único
+despliegue** de Vercel usando [Services](https://vercel.com/docs/services).
+`vercel.json` declara las dos y reparte el tráfico:
 
-Las credenciales de Supabase se cargan como variables de entorno del proyecto
-en Vercel. `main.py` las lee al importar el módulo: si falta una, la función no
-arranca.
+```json
+{
+  "services": {
+    "sitio": { "root": "sitio/" },
+    "api":   { "root": "microservicio_resenas/", "entrypoint": "main:app" }
+  },
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": { "service": "api" } },
+    { "source": "/(.*)",     "destination": { "service": "sitio" } }
+  ]
+}
+```
+
+| URL | La atiende | Qué devuelve |
+|---|---|---|
+| `tudominio.vercel.app/` | `sitio` | el catálogo en HTML |
+| `tudominio.vercel.app/libro/1/resenas/` | `sitio` | HTML, con las reseñas pedidas a la API |
+| `tudominio.vercel.app/api/libros/1/resenas` | `api` | JSON crudo desde Supabase |
+
+Compartir dominio **no las convierte en una sola aplicación**. Cada una se
+construye por separado, con sus propias dependencias, y la vista de Django sigue
+hablando con la API por HTTP. El dominio es la puerta de entrada, no el programa.
+
+Dos detalles que rompen el despliegue si se pasan por alto:
+
+1. **Las dos carpetas tienen que ser hermanas.** Por eso Django vive en `sitio/`
+   y no en la raíz: un servicio no puede contener al otro.
+2. **El servicio recibe la ruta completa.** Una petición a `/api/salud` le llega a
+   FastAPI como `/api/salud`, no como `/salud`. Por eso las rutas de `main.py`
+   cuelgan de un `APIRouter(prefix="/api")`.
+
+Django deduce la URL de la API desde `VERCEL_URL`, que Vercel define solo: como
+comparten dominio, no hay que configurar nada.
 
 ---
 

@@ -174,9 +174,20 @@ MAILERS = {
 # Servicio propio (FastAPI + Supabase) desplegado en Render. Django no accede a
 # esa base de datos: la consume por HTTP. En local se levanta en el puerto 8001.
 
-MICROSERVICIO_RESENAS_URL = os.environ.get(
-    'MICROSERVICIO_RESENAS_URL',
-    'http://127.0.0.1:8001',
-).rstrip('/')
+# El sitio y la API comparten dominio y despliegue: el sitio vive en / y la API
+# en /api. Vercel publica el dominio del despliegue en VERCEL_URL, asi que no
+# hace falta configurar nada. En local, la API se levanta en el puerto 8001.
+
+def _url_del_microservicio():
+    explicita = os.environ.get('MICROSERVICIO_RESENAS_URL')
+    if explicita:
+        return explicita
+    dominio = os.environ.get('VERCEL_URL')
+    if dominio:
+        return f'https://{dominio}/api'
+    return 'http://127.0.0.1:8001/api'
+
+
+MICROSERVICIO_RESENAS_URL = _url_del_microservicio().rstrip('/')
 
 MICROSERVICIO_RESENAS_TIMEOUT = 5  # segundos

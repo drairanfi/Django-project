@@ -5,7 +5,7 @@ Django NO habla con esta base de datos: habla con esta API por HTTP.
 """
 import os
 
-from fastapi import FastAPI, HTTPException
+from fastapi import APIRouter, FastAPI, HTTPException
 from pydantic import BaseModel, Field
 from supabase import Client, create_client
 
@@ -37,6 +37,12 @@ app = FastAPI(
     version="1.0.0",
 )
 
+# Todas las rutas cuelgan de /api porque el servicio comparte dominio con el
+# sitio Django: el sitio vive en / y la API en /api. Vercel enruta por prefijo y
+# le entrega al servicio la ruta completa, con /api incluido, asi que el prefijo
+# tiene que estar declarado aca tambien.
+api = APIRouter(prefix="/api")
+
 
 class ResenaNueva(BaseModel):
     """Datos que el cliente envía para crear una reseña."""
@@ -47,7 +53,7 @@ class ResenaNueva(BaseModel):
     comentario: str = Field("", max_length=1000)
 
 
-@app.get("/")
+@api.get("/")
 def raiz():
     """Describe el servicio para quien entra a la URL base."""
     return {
@@ -55,21 +61,21 @@ def raiz():
         "version": "1.0.0",
         "base_de_datos": "Supabase (PostgreSQL)",
         "endpoints": [
-            "GET /salud",
-            "GET /resenas",
-            "GET /libros/{libro_id}/resenas",
-            "POST /resenas",
+            "GET /api/salud",
+            "GET /api/resenas",
+            "GET /api/libros/{libro_id}/resenas",
+            "POST /api/resenas",
         ],
     }
 
 
-@app.get("/salud")
+@api.get("/salud")
 def salud():
     """Health check: Render lo usa para saber si el servicio está vivo."""
     return {"estado": "ok"}
 
 
-@app.get("/resenas")
+@api.get("/resenas")
 def listar_resenas():
     """Devuelve todas las reseñas ordenadas de la más nueva a la más vieja."""
     try:
@@ -85,7 +91,7 @@ def listar_resenas():
     return {"cantidad": len(respuesta.data), "resenas": respuesta.data}
 
 
-@app.get("/libros/{libro_id}/resenas")
+@api.get("/libros/{libro_id}/resenas")
 def resenas_de_libro(libro_id: int):
     """Devuelve las reseñas de un libro con su promedio de puntaje.
 
@@ -115,7 +121,7 @@ def resenas_de_libro(libro_id: int):
     }
 
 
-@app.post("/resenas", status_code=201)
+@api.post("/resenas", status_code=201)
 def crear_resena(resena: ResenaNueva):
     """Inserta una reseña nueva en Supabase y la devuelve ya guardada."""
     try:
@@ -127,3 +133,6 @@ def crear_resena(resena: ResenaNueva):
         raise HTTPException(status_code=502, detail="Supabase no devolvió la fila insertada")
 
     return respuesta.data[0]
+
+
+app.include_router(api)

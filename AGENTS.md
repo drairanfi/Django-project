@@ -35,18 +35,31 @@ salientes usan `urllib` de la biblioteca estándar, no `requests`.
 
 ## Comandos
 
-El entorno virtual vive en `venv/` y **no** está versionado (`.gitignore` lo excluye,
-igual que `db.sqlite3` y `staticfiles/`). Para recrearlo: `python3 -m venv venv` y
-`venv/bin/pip install -r requirements.txt`. Después usá su intérprete directamente:
+Cada servicio tiene su propio entorno virtual en su carpeta, y ninguno está
+versionado (`.gitignore` excluye `venv/`, `db.sqlite3`, `.env` y `staticfiles/`).
+
+El archivo `.env` de la raíz tiene la configuración local de **los dos** servicios.
+Se carga en la shell con `set -a; . ../.env; set +a`.
 
 ```bash
+cd sitio
+python3 -m venv venv                     # solo la primera vez
+venv/bin/pip install -r requirements.txt
+
 venv/bin/python manage.py check          # validar configuración
-venv/bin/python manage.py test           # correr los 5 tests
+venv/bin/python manage.py test           # correr los 5 tests (usan SQLite)
 venv/bin/python manage.py runserver      # levantar en http://127.0.0.1:8000/
 venv/bin/python manage.py makemigrations # tras tocar models.py
 venv/bin/python manage.py migrate
 venv/bin/python seed.py                  # datos de ejemplo (idempotente)
 ```
+
+Los comandos de Django hay que correrlos **desde `sitio/`**: el descubrimiento de
+tests parte del directorio actual, y desde la raíz del repo no encuentra ninguno.
+
+Los tests tienen que correr contra SQLite. Si `DATABASE_URL` está cargada en la
+shell, Django crea una base de test en Supabase: lento y deja basura. Para
+evitarlo: `env -u DATABASE_URL venv/bin/python manage.py test`.
 
 Credenciales del admin que crea el seed: `admin` / `admin123`.
 
@@ -104,7 +117,7 @@ Se eliminó deliberadamente todo el CSS para que el proyecto se vea básico.
 
 - **No agregues CSS, clases, `<style>`, frameworks ni JS.** Si te parece que "queda
   feo", así tiene que quedar.
-- Todos los templates extienden `templates/base.html`.
+- Todos los templates extienden `sitio/templates/base.html`.
 - Tablas con `border="1"`, separadores con `<hr>`, navegación con `|` entre links.
 - URLs siempre con `{% url 'app:nombre' %}`, nunca hardcodeadas.
 - Los templates solo muestran datos del context. No consultan la base de datos.
@@ -119,22 +132,33 @@ Se eliminó deliberadamente todo el CSS para que el proyecto se vea básico.
 ## Estructura
 
 ```
-biblioteca/        configuración del proyecto (settings, urls raíz)
-libros/            app 1: Autor, Categoria, Libro → 4 vistas
-prestamos/         app 2: Lector, Prestamo → 5 vistas
-microservicio_resenas/  servicio aparte: FastAPI + Supabase, se despliega en Vercel
+vercel.json             define los dos servicios y el enrutado por dominio
+.env                    configuración local de ambos (no se versiona)
+
+sitio/                  SERVICIO 1 - el sitio web (Django)
+  biblioteca/           configuración del proyecto (settings, urls raíz)
+  libros/               app 1: Autor, Categoria, Libro → 5 vistas
+  prestamos/            app 2: Lector, Prestamo → 5 vistas
+  templates/            base.html (compartido)
+  requirements.txt      dependencias del sitio
+  seed.py               datos de ejemplo, idempotente
+
+microservicio_resenas/  SERVICIO 2 - la API de reseñas (FastAPI)
+  main.py               endpoints, todos bajo /api
+  requirements.txt      dependencias de la API
+  schema.sql            tabla resenas en Supabase
 templates/         base.html (compartido)
 seed.py            carga de datos de ejemplo, idempotente con get_or_create
 README.md          documentación del TP
 ```
 
 Cada app tiene su `urls.py` con `app_name` definido y se incluye desde
-`biblioteca/urls.py` con `include()`.
+`sitio/biblioteca/urls.py` con `include()`.
 
 ## Al modificar el código
 
 1. Corré `venv/bin/python manage.py check` y `venv/bin/python manage.py test`.
-2. **El README referencia números de línea** (ej. `libros/views.py:32`). Si agregás o
+2. **El README referencia números de línea** (ej. `sitio/libros/views.py:32`). Si agregás o
    sacás líneas en `views.py`, esas referencias quedan desactualizadas — actualizalas
    en las tablas de "Requisitos de la consigna" y "Vistas y rutas".
 3. Si tocás `models.py`, generá la migración en el mismo cambio.
@@ -149,7 +173,7 @@ Reglas:
 
 - **No crees un modelo `Resena` en Django.** El punto del ejercicio es que ese
   dato viva fuera de SQLite.
-- Toda llamada HTTP pasa por `libros/servicios.py`. Las vistas no arman URLs ni
+- Toda llamada HTTP pasa por `sitio/libros/servicios.py`. Las vistas no arman URLs ni
   parsean JSON: llaman a una función del módulo de servicios.
 - Toda llamada remota va envuelta en `try/except MicroservicioNoDisponible` y
   con timeout. Si el servicio se cae, la vista muestra un aviso, nunca un 500.
@@ -180,13 +204,23 @@ Reglas:
 
 ## Despliegue
 
-Son **dos aplicaciones separadas**, cada una su propio proyecto en Vercel:
+Son **dos aplicaciones separadas en un solo despliegue**, usando Vercel Services.
+`vercel.json` las declara y las enruta bajo el mismo dominio:
 
-| Qué | Root Directory | Entrypoint |
-|---|---|---|
-| Sitio Django | raíz del repo | `manage.py` → `biblioteca/wsgi.py` |
-| Microservicio de reseñas | `microservicio_resenas` | `main.py` |
+| Servicio | Carpeta | Ruta pública | Entrypoint |
+|---|---|---|---|
+| `sitio` | `sitio/` | `/` | `manage.py` → `biblioteca/wsgi.py` |
+| `api` | `microservicio_resenas/` | `/api` | `main:app` |
 
-Vercel detecta Django por `manage.py`, resuelve el entrypoint desde
-`WSGI_APPLICATION` y corre `collectstatic` solo porque `STATIC_ROOT` está definido.
-No hace falta `vercel.json` ni build command.
+Detalles que importan:
+
+- **Las carpetas son hermanas a propósito.** Una no puede contener a la otra:
+  cada servicio se construye por separado desde su propia raíz.
+- **El servicio recibe la ruta completa.** Una petición a `/api/salud` le llega a
+  FastAPI como `/api/salud`, no como `/salud`. Por eso las rutas de `main.py`
+  cuelgan de un `APIRouter(prefix="/api")`. Si sacás el prefijo, todo da 404.
+- Vercel detecta Django por `manage.py`, resuelve el entrypoint desde
+  `WSGI_APPLICATION` y corre `collectstatic` solo porque `STATIC_ROOT` está
+  definido. No hace falta build command.
+- Django deduce la URL de la API desde `VERCEL_URL`: comparten dominio, así que no
+  hay que configurar nada.
