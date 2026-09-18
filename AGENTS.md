@@ -117,7 +117,7 @@ Se eliminó deliberadamente todo el CSS para que el proyecto se vea básico.
 biblioteca/        configuración del proyecto (settings, urls raíz)
 libros/            app 1: Autor, Categoria, Libro → 4 vistas
 prestamos/         app 2: Lector, Prestamo → 5 vistas
-microservicio_resenas/  servicio aparte: FastAPI + Supabase, se despliega en Render
+microservicio_resenas/  servicio aparte: FastAPI + Supabase, se despliega en Vercel
 templates/         base.html (compartido)
 seed.py            carga de datos de ejemplo, idempotente con get_or_create
 README.md          documentación del TP
@@ -138,7 +138,7 @@ Cada app tiene su `urls.py` con `app_name` definido y se incluye desde
 ## Microservicio de reseñas
 
 Las reseñas NO son un modelo de Django. Viven en Supabase y se leen por HTTP
-desde `microservicio_resenas/`, desplegado en Render.
+desde `microservicio_resenas/`, desplegado en Vercel.
 
 Reglas:
 

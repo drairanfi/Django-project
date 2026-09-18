@@ -6,7 +6,7 @@ de datos ni código con ella.
 
 ```
 Navegador ──► Django (SQLite, local)
-                 └─ vista resenas_libro() ──HTTP──► este microservicio (Render)
+                 └─ vista resenas_libro() ──HTTP──► este microservicio (Vercel)
                                                        └── Supabase (PostgreSQL)
 ```
 
@@ -24,7 +24,7 @@ Navegador ──► Django (SQLite, local)
 | Método | Ruta | Qué hace |
 |---|---|---|
 | GET | `/` | Describe el servicio |
-| GET | `/salud` | Health check que usa Render |
+| GET | `/salud` | Health check de la plataforma |
 | GET | `/resenas` | Todas las reseñas |
 | GET | `/libros/{libro_id}/resenas` | Reseñas de un libro + promedio — **el que consume Django** |
 | POST | `/resenas` | Crea una reseña |
@@ -75,7 +75,7 @@ cp .env.example .env        # y completá los dos valores de Supabase
 ```
 
 Las credenciales se leen de variables de entorno, no del archivo `.env`: en
-Render no hay `.env`, las inyecta la plataforma. Para que el shell las cargue
+Vercel no hay `.env`, las inyecta la plataforma. Para que el shell las cargue
 desde el archivo en local:
 
 ```bash
@@ -89,41 +89,56 @@ venv/bin/uvicorn main:app --reload --port 8001       # http://127.0.0.1:8001/doc
 
 El puerto 8001 es el que Django usa por defecto en local (`MICROSERVICIO_RESENAS_URL`).
 
-## Paso 3 — Desplegar en Render
+## Paso 3 — Desplegar en Vercel
 
-1. Subí el repo a GitHub.
-2. En [render.com](https://render.com): **New → Web Service** → conectá el repo.
-3. Configuración:
+Vercel detecta FastAPI solo: busca un entrypoint (`main.py` con un objeto `app`)
+y un `requirements.txt`, y compila todo en **una sola función**.
 
-   | Campo | Valor |
-   |---|---|
-   | Root Directory | `microservicio_resenas` |
-   | Runtime | Python 3 |
-   | Build Command | `pip install -r requirements.txt` |
-   | Start Command | `uvicorn main:app --host 0.0.0.0 --port $PORT` |
-   | Health Check Path | `/salud` |
-   | Instance Type | Free |
+La clave es que el proyecto de Vercel apunte a esta carpeta, **no a la raíz del
+repo**. En la raíz está `manage.py`, y si Vercel lo ve intenta desplegar Django
+—que acá no se despliega, corre local contra SQLite— y el build falla con:
 
-4. En **Environment** cargá `SUPABASE_URL` y `SUPABASE_SERVICE_KEY`.
-5. Deploy. Render te da una URL tipo `https://microservicio-resenas.onrender.com`.
+```
+Failed to read Django application settings from /vercel/path0/manage.py
+ModuleNotFoundError: No module named 'django'
+```
 
-El archivo [`../render.yaml`](../render.yaml) tiene esta misma configuración como
-Blueprint: si usás **New → Blueprint**, Render la lee y solo te pide las dos
-credenciales.
+Configuración del proyecto en Vercel:
+
+| Ajuste | Dónde | Valor |
+|---|---|---|
+| Root Directory | Settings → Build & Deployment | `microservicio_resenas` |
+| SUPABASE_URL | Settings → Environment Variables | tu Project URL |
+| SUPABASE_SERVICE_KEY | Settings → Environment Variables | tu `service_role` key |
+
+Las dos variables van marcadas para **Production, Preview y Development**.
+`main.py` las lee al importar el módulo: si falta una, la función no arranca.
+
+Después, **Redeploy**. Vercel te da una URL tipo
+`https://tu-proyecto.vercel.app`. Verificala:
+
+```bash
+curl https://tu-proyecto.vercel.app/salud
+# {"estado":"ok"}
+```
+
+### Alternativa: Render
+
+[`../render.yaml`](../render.yaml) deja el mismo servicio listo para Render
+(**New → Blueprint**), con `rootDir: microservicio_resenas`, build
+`pip install -r requirements.txt` y start
+`uvicorn main:app --host 0.0.0.0 --port $PORT`.
+
+Diferencia práctica: en Render el plan free **duerme el servicio tras 15 minutos**
+sin tráfico y el primer request tarda 30-50 segundos —más que el timeout de 5
+segundos de Django, así que la primera carga muestra el aviso de "microservicio
+no disponible". En Vercel no pasa: el cold start es de uno o dos segundos.
 
 ## Paso 4 — Apuntar Django al servicio desplegado
 
 ```bash
-export MICROSERVICIO_RESENAS_URL="https://microservicio-resenas.onrender.com"
+export MICROSERVICIO_RESENAS_URL="https://tu-proyecto.vercel.app"
 venv/bin/python manage.py runserver
 ```
 
 Entrá a un libro y seguí el link **"Ver reseñas (microservicio externo)"**.
-
-## Detalle del plan free de Render
-
-El servicio se **duerme tras 15 minutos sin tráfico** y el primer request luego
-puede tardar ~30-50 segundos en despertarlo. Django tiene un timeout de 5
-segundos (`MICROSERVICIO_RESENAS_TIMEOUT`), así que la primera carga puede
-mostrar el mensaje de "microservicio no disponible" y funcionar al recargar.
-Antes de mostrar el trabajo, abrí la URL del servicio una vez para despertarlo.

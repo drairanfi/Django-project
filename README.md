@@ -65,7 +65,7 @@ Un sistema web que permite:
 | **Uso de shortcuts de Django** | Las 10 vistas usan `render(...)`; 7 usan `get_object_or_404(...)`. Cero `HttpResponse` crudo, cero `loader.get_template`, cero `raise Http404` manual | `render()` une template + context en una sola respuesta. `get_object_or_404()` evita el `try/except Model.DoesNotExist` a mano y devuelve un 404 real. |
 | **Patrón vista → context → template** | Las 10 vistas declaran una variable `context` explícita antes del `return render(...)` — ver [sección dedicada](#-el-patrón-vista--context--template) | La vista **consume el modelo**, arma un **diccionario `context`** y se lo **envía al template**. El template solo muestra: no consulta la base de datos. |
 | **Rutas dinámicas con parámetros y vistas que hacen algo con esa info** | `libros/urls.py:9-11` (`<int:libro_id>`, `<int:categoria_id>`, `<int:autor_id>`) y `prestamos/urls.py:9-12` (`<int:lector_id>`, `<str:estado>`, `<int:libro_id>`, `<int:prestamo_id>`) | Las URLs **capturan parámetros** y las vistas los reciben en su firma para filtrar datos, crear o actualizar registros. |
-| **Una vista consume un microservicio propio en la nube, sobre una base distinta de SQLite** | `libros/views.py:58` → `resenas_libro()` llama por HTTP a `microservicio_resenas/` (FastAPI en Render) a través del cliente `libros/servicios.py` — ver [sección dedicada](#-microservicio-externo-de-reseñas) | Las reseñas viven en **Supabase (PostgreSQL)**, no en `db.sqlite3`. Django no tiene credenciales de esa base: solo conoce una URL HTTP. |
+| **Una vista consume un microservicio propio en la nube, sobre una base distinta de SQLite** | `libros/views.py:58` → `resenas_libro()` llama por HTTP a `microservicio_resenas/` (FastAPI en Vercel) a través del cliente `libros/servicios.py` — ver [sección dedicada](#-microservicio-externo-de-reseñas) | Las reseñas viven en **Supabase (PostgreSQL)**, no en `db.sqlite3`. Django no tiene credenciales de esa base: solo conoce una URL HTTP. |
 
 ### Detalle: rutas dinámicas → cómo fluye la información
 
@@ -468,7 +468,7 @@ Salida esperada: `System check identified no issues (0 silenced).`
 ## 🌐 Microservicio externo de reseñas
 
 Las reseñas de los libros **no están en SQLite**. Viven en un microservicio
-propio, escrito en FastAPI, desplegado en **Render**, que guarda los datos en
+propio, escrito en FastAPI, desplegado en **Vercel**, que guarda los datos en
 **Supabase** (PostgreSQL administrado). Django los consume por HTTP.
 
 ```
@@ -478,7 +478,7 @@ Navegador
 Django (SQLite, local)
    │  Libro, Autor, Categoria, Prestamo  ──► ORM ──► db.sqlite3
    │
-   └─ vista resenas_libro() ──HTTP GET──► microservicio-resenas (Render)
+   └─ vista resenas_libro() ──HTTP GET──► microservicio-resenas (Vercel)
                                               │
                                               └── tabla resenas ──► Supabase (PostgreSQL)
 ```
@@ -527,8 +527,8 @@ def resenas_libro(request, libro_id):
 ### Por qué el `try/except` no es opcional
 
 Una consulta al ORM local falla casi solo si hay un bug. Una llamada HTTP a otra
-máquina falla por motivos que no controlás: se cayó la red, Render durmió el
-servicio, Supabase está lento, cambió la URL. **Toda llamada remota se asume
+máquina falla por motivos que no controlás: se cayó la red, la plataforma
+reinició el servicio, Supabase está lento, cambió la URL. **Toda llamada remota se asume
 falible.** Si el microservicio no responde, la página se sigue mostrando con un
 aviso; no devuelve un error 500. Eso es *degradación controlada*, y es la
 diferencia práctica entre leer de una base local y leer de un servicio externo.
@@ -549,10 +549,10 @@ MICROSERVICIO_RESENAS_TIMEOUT = 5  # segundos
 ```
 
 La URL se lee de una variable de entorno. En local apunta al servicio corriendo
-en el puerto 8001; en la entrega apunta a Render:
+en el puerto 8001; en la entrega apunta al servicio desplegado:
 
 ```bash
-export MICROSERVICIO_RESENAS_URL="https://microservicio-resenas.onrender.com"
+export MICROSERVICIO_RESENAS_URL="https://tu-proyecto.vercel.app"
 venv/bin/python manage.py runserver
 ```
 
@@ -575,11 +575,16 @@ venv/bin/python manage.py runserver
 El formulario de la página también hace `POST /resenas` contra el mismo
 servicio: la reseña se escribe en Supabase, nunca en SQLite.
 
-### Nota sobre el plan free de Render
+### Nota sobre el despliegue
 
-El servicio se duerme tras 15 minutos sin tráfico y el primer request puede
-tardar ~30-50 segundos en despertarlo — más que el timeout de 5 segundos. Antes
-de mostrar el proyecto, abrí la URL del microservicio una vez para despertarlo.
+El proyecto de Vercel tiene que apuntar a la carpeta `microservicio_resenas/`
+(**Root Directory**), no a la raíz del repositorio. En la raíz está `manage.py`,
+y si Vercel lo detecta intenta desplegar Django —que no se despliega, corre
+local contra SQLite— y el build falla.
+
+Las credenciales de Supabase se cargan como variables de entorno del proyecto
+en Vercel. `main.py` las lee al importar el módulo: si falta una, la función no
+arranca.
 
 ---
 
@@ -592,6 +597,6 @@ de mostrar el proyecto, abrí la URL del microservicio una vez para despertarlo.
 | SQLite | — | Base de datos local de Django (archivo `db.sqlite3`) |
 | FastAPI | 0.141.1 | Microservicio de reseñas (repo: `microservicio_resenas/`) |
 | Supabase | — | PostgreSQL en la nube, base del microservicio |
-| Render | — | Hosting del microservicio |
+| Vercel | — | Hosting del microservicio (Python Functions) |
 | HTML | — | Plantillas: `base.html` + una por vista, sin CSS ni JS |
 | Git / zip | — | Entrega del trabajo práctico |
