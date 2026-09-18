@@ -182,7 +182,13 @@ def _url_del_microservicio():
     explicita = os.environ.get('MICROSERVICIO_RESENAS_URL')
     if explicita:
         return explicita
-    dominio = os.environ.get('VERCEL_URL')
+    # VERCEL_PROJECT_PRODUCTION_URL es el dominio publico y estable del proyecto.
+    # VERCEL_URL apunta al deployment concreto, que puede estar detras de la
+    # proteccion de acceso: pedirle JSON devuelve la pagina de login.
+    dominio = (
+        os.environ.get('VERCEL_PROJECT_PRODUCTION_URL')
+        or os.environ.get('VERCEL_URL')
+    )
     if dominio:
         return f'https://{dominio}/api'
     return 'http://127.0.0.1:8001/api'
