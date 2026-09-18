@@ -18,13 +18,16 @@ un código peor para este repo.
 |---|---|
 | Python | 3.14.7 |
 | Django | 6.1.1 |
-| Base de datos | SQLite (`db.sqlite3`, versionada) |
+| Base de datos | SQLite en local, PostgreSQL (Supabase) en el despliegue |
 | Microservicio | FastAPI + Supabase, en `microservicio_resenas/` (deps propias) |
 
-Sin dependencias externas más allá de Django. Sin CSS, sin JavaScript, sin frontend
-build. **No agregues librerías** (ni `requirements.txt` con extras, ni Bootstrap, ni
-Tailwind, ni HTMX) salvo pedido explícito. Las llamadas HTTP salientes usan `urllib`
-de la biblioteca estándar, no `requests`.
+Sin CSS, sin JavaScript, sin frontend build. **No agregues librerías de frontend**
+(ni Bootstrap, ni Tailwind, ni HTMX) salvo pedido explícito. Las llamadas HTTP
+salientes usan `urllib` de la biblioteca estándar, no `requests`.
+
+`requirements.txt` tiene solo lo que el despliegue necesita: Django, `psycopg`
+(driver de PostgreSQL), `dj-database-url` (parsea `DATABASE_URL`) y `whitenoise`
+(archivos estáticos). No sumes nada más sin pedido explícito.
 
 `microservicio_resenas/` es la excepción: es un servicio aparte, con su propio
 `requirements.txt` y su propio ciclo de vida. Sus dependencias NO se instalan en el
@@ -32,7 +35,9 @@ de la biblioteca estándar, no `requests`.
 
 ## Comandos
 
-El entorno virtual vive en `venv/` y está versionado. Usá su intérprete directamente:
+El entorno virtual vive en `venv/` y **no** está versionado (`.gitignore` lo excluye,
+igual que `db.sqlite3` y `staticfiles/`). Para recrearlo: `python3 -m venv venv` y
+`venv/bin/pip install -r requirements.txt`. Después usá su intérprete directamente:
 
 ```bash
 venv/bin/python manage.py check          # validar configuración
@@ -153,3 +158,35 @@ Reglas:
 
 Para trabajar en local hay que levantar el microservicio en el puerto 8001
 (ver `microservicio_resenas/README.md`).
+
+## Configuración por entorno
+
+`settings.py` no tiene valores de producción escritos a mano: los lee de variables
+de entorno y cae a valores de desarrollo cuando no están.
+
+| Variable | Sin ella | Con ella |
+|---|---|---|
+| `DATABASE_URL` | SQLite en `db.sqlite3` | PostgreSQL (Supabase) |
+| `DJANGO_SECRET_KEY` | la clave de desarrollo | la clave del servidor |
+| `DJANGO_DEBUG` | `True` | `False` si vale otra cosa |
+| `MICROSERVICIO_RESENAS_URL` | `http://127.0.0.1:8001` | la URL del servicio desplegado |
+
+Reglas:
+
+- **No escribas credenciales en `settings.py`.** Van por variable de entorno.
+- **No quites el fallback a SQLite.** Los tests y el desarrollo local dependen de él.
+- `conn_max_age=0` es a propósito: cada invocación serverless es efímera, las
+  conexiones persistentes no sobreviven y agotan el pool de Postgres.
+
+## Despliegue
+
+Son **dos aplicaciones separadas**, cada una su propio proyecto en Vercel:
+
+| Qué | Root Directory | Entrypoint |
+|---|---|---|
+| Sitio Django | raíz del repo | `manage.py` → `biblioteca/wsgi.py` |
+| Microservicio de reseñas | `microservicio_resenas` | `main.py` |
+
+Vercel detecta Django por `manage.py`, resuelve el entrypoint desde
+`WSGI_APPLICATION` y corre `collectstatic` solo porque `STATIC_ROOT` está definido.
+No hace falta `vercel.json` ni build command.

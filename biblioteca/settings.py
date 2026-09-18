@@ -20,13 +20,21 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-6cpzk*miyoek3_=gp$(1$kse1rm2o!f7b#)2w(z&pca61tjn(^'
+# En desarrollo valen los valores de abajo. En el servidor, cada uno se toma de
+# una variable de entorno: la clave secreta no puede quedar publicada en el repo
+# y DEBUG encendido en produccion filtra el codigo fuente en cada error.
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+SECRET_KEY = os.environ.get(
+    'DJANGO_SECRET_KEY',
+    'django-insecure-6cpzk*miyoek3_=gp$(1$kse1rm2o!f7b#)2w(z&pca61tjn(^',
+)
 
-ALLOWED_HOSTS = []
+DEBUG = os.environ.get('DJANGO_DEBUG', 'True') == 'True'
+
+# Vercel publica el dominio del despliegue en VERCEL_URL, sin el esquema.
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '.vercel.app']
+
+CSRF_TRUSTED_ORIGINS = ['https://*.vercel.app']
 
 
 # Application definition
@@ -44,6 +52,9 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    # WhiteNoise sirve los archivos estaticos desde la propia app. Sin esto el
+    # admin se ve sin estilos en el servidor, porque alli no corre runserver.
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -75,12 +86,29 @@ WSGI_APPLICATION = 'biblioteca.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.1/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+# Sin DATABASE_URL se usa SQLite, que es lo comodo para desarrollar y para correr
+# los tests. En el servidor hay que definirla: un despliegue serverless no tiene
+# disco donde escribir, asi que un archivo .sqlite3 no sirve alli.
+
+DATABASE_URL = os.environ.get('DATABASE_URL', '')
+
+if DATABASE_URL:
+    import dj_database_url
+
+    DATABASES = {
+        'default': dj_database_url.parse(
+            DATABASE_URL,
+            conn_max_age=0,          # sin conexiones persistentes: cada invocacion es efimera
+            ssl_require=True,
+        ),
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 
 # Password validation
@@ -118,6 +146,18 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.1/howto/static-files/
 
 STATIC_URL = 'static/'
+
+# Carpeta donde collectstatic junta los estaticos antes de desplegar.
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+STORAGES = {
+    'default': {
+        'BACKEND': 'django.core.files.storage.FileSystemStorage',
+    },
+    'staticfiles': {
+        'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
+    },
+}
 
 
 # Email
