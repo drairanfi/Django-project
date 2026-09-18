@@ -50,3 +50,5 @@ pytest_cache/
 .ruff_cache/
 .pytype/
 pylint.log
+.vercel
+.vercel/

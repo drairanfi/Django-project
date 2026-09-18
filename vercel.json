@@ -2,7 +2,8 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "services": {
     "sitio": {
-      "root": "sitio/"
+      "root": "sitio/",
+      "entrypoint": "biblioteca.wsgi:application"
     },
     "api": {
       "root": "microservicio_resenas/",
@@ -10,7 +11,17 @@
     }
   },
   "rewrites": [
-    { "source": "/api/(.*)", "destination": { "service": "api" } },
-    { "source": "/(.*)", "destination": { "service": "sitio" } }
+    {
+      "source": "/api/(.*)",
+      "destination": {
+        "service": "api"
+      }
+    },
+    {
+      "source": "/(.*)",
+      "destination": {
+        "service": "sitio"
+      }
+    }
   ]
 }
