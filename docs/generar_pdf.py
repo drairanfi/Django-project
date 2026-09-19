@@ -142,6 +142,35 @@ def destacado(titulo, texto):
     return [t, Spacer(1, 10)]
 
 
+def glosario(titulo, entradas):
+    """Bloque de glosario: termino a la izquierda, definicion a la derecha."""
+    piezas = [Paragraph(titulo, H3)]
+    datos = []
+    for termino, definicion in entradas:
+        datos.append([
+            Paragraph(f"<b>{termino}</b>", estilo("gt", fontSize=8.8, leading=12)),
+            Paragraph(definicion, estilo("gd", fontSize=8.8, leading=12.4,
+                                         alignment=TA_JUSTIFY)),
+        ])
+    t = Table(datos, colWidths=[4.0 * cm, 12.4 * cm])
+    t.setStyle(TableStyle([
+        ("ROWBACKGROUNDS", (0, 0), (-1, -1), [colors.white, GRIS_FONDO]),
+        ("LINEBELOW", (0, 0), (-1, -2), 0.3, BORDE),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 7),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 7),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+    ]))
+    piezas.append(t)
+    piezas.append(Spacer(1, 10))
+    # Un grupo corto entra entero en una pagina: se mantiene junto para que el
+    # titulo no quede huerfano al pie con una sola fila debajo.
+    if len(entradas) <= 7:
+        return [KeepTogether(piezas)]
+    return piezas
+
+
 def pie(canvas, doc):
     canvas.saveState()
     canvas.setStrokeColor(BORDE)
@@ -738,6 +767,206 @@ c.append(Paragraph(
     "<font face='Courier' size=8>sitio/libros/views.py</font>, "
     "<font face='Courier' size=8>vercel.json</font>",
     estilo("Ref", fontSize=8.3, leading=12.5, textColor=GRIS)))
+
+
+# ------------------------------------------------------- 7. GLOSARIO
+c.append(PageBreak())
+c.append(Paragraph("7. Glosario de términos", H1))
+c.append(parrafo(
+    "Los términos que aparecen en este documento, agrupados por tema. Los ejemplos "
+    "salen del propio proyecto."))
+
+c += glosario("Arquitectura", [
+    ("Microservicio",
+     "Aplicación pequeña e independiente que resuelve una sola responsabilidad y se "
+     "comunica con el resto por la red. No comparte código ni base de datos con quien "
+     "la consume. Acá: la API de reseñas."),
+    ("Monolito",
+     "Lo opuesto: una única aplicación que hace todo y comparte una sola base de datos. "
+     "El sitio Django, por sí solo, es un monolito, y para este tamaño está bien."),
+    ("Acoplamiento",
+     "Cuánto depende una parte del sistema de los detalles internos de otra. Que Django "
+     "conozca solo una URL, y no el esquema de la base de reseñas, es bajo acoplamiento."),
+    ("Contrato",
+     "Lo que un servicio promete públicamente: sus URLs y el formato de sus respuestas. "
+     "Mientras el contrato no cambie, el microservicio puede reescribirse por dentro sin "
+     "que Django se entere."),
+    ("Degradación controlada",
+     "Que el sistema siga funcionando, con menos información, cuando una parte falla. "
+     "Si la API se cae, la página del libro se muestra igual con un aviso en lugar de "
+     "las reseñas."),
+    ("Shared database antipattern",
+     "El error de que dos servicios escriban la misma tabla con definiciones propias del "
+     "esquema. Tarde o temprano se desincronizan. Es la razón de que no exista un modelo "
+     "<font face='Courier' size=8>Resena</font> en Django."),
+])
+
+c += glosario("Web y HTTP", [
+    ("HTTP",
+     "El protocolo con el que se piden y devuelven cosas en la web. Es el canal por el "
+     "que la vista de Django habla con el microservicio."),
+    ("GET / POST",
+     "Los dos métodos HTTP que usa el proyecto. <b>GET</b> pide datos sin modificar nada; "
+     "<b>POST</b> envía datos para crear algo."),
+    ("JSON",
+     "Formato de texto para intercambiar datos, con llaves y listas. Es lo que devuelve "
+     "el microservicio y lo que la vista convierte en un diccionario de Python."),
+    ("API",
+     "Interfaz de programación: el conjunto de URLs que un servicio expone para que otros "
+     "programas lo usen. Devuelve datos, no páginas."),
+    ("Endpoint",
+     "Una URL concreta de una API, con su método. Por ejemplo "
+     "<font face='Courier' size=8>GET /api/libros/1/resenas</font>."),
+    ("Timeout",
+     "El tiempo máximo que se espera una respuesta antes de darla por perdida. Acá son "
+     "5 segundos. Sin timeout, una vista puede quedar colgada para siempre."),
+    ("Health check",
+     "Endpoint trivial que solo responde si el servicio está vivo. Acá es "
+     "<font face='Courier' size=8>/api/salud</font>. Lo usan las plataformas para "
+     "monitorear."),
+])
+
+c += glosario("Códigos de estado que usa el proyecto", [
+    ("200 OK", "Todo bien. Un libro sin reseñas también devuelve 200: una lista vacía "
+               "es un resultado válido, no un error."),
+    ("201 Created", "Se creó algo. Lo devuelve <font face='Courier' size=8>POST /api/resenas</font>."),
+    ("404 Not Found", "No existe lo pedido. Lo produce "
+                      "<font face='Courier' size=8>get_object_or_404</font> cuando el libro no está."),
+    ("422 Unprocessable", "Los datos enviados no pasaron la validación. FastAPI lo devuelve "
+                          "solo, por ejemplo con un puntaje de 9."),
+    ("500 Internal Error", "El servidor se rompió. Es lo que el <font face='Courier' size=8>"
+                           "try/except</font> de la vista evita cuando la API no responde."),
+    ("502 Bad Gateway", "Un servicio intermedio falló. El microservicio lo devuelve si "
+                        "Supabase no contesta."),
+])
+
+c += glosario("Django", [
+    ("Vista",
+     "Función que recibe una petición, consigue los datos y devuelve una respuesta. "
+     "En este proyecto siempre sigue tres pasos: consumir datos, armar el "
+     "<font face='Courier' size=8>context</font>, renderizar el template."),
+    ("Template",
+     "Plantilla HTML con huecos que se rellenan con los datos del "
+     "<font face='Courier' size=8>context</font>. No consulta la base de datos."),
+    ("Context",
+     "Diccionario que la vista le pasa al template. Es la frontera entre la lógica y la "
+     "presentación."),
+    ("ORM",
+     "<i>Object-Relational Mapper</i>. Traduce clases de Python a tablas SQL, para no "
+     "escribir consultas a mano. <font face='Courier' size=8>Libro.objects.filter(...)</font> "
+     "es el ORM trabajando."),
+    ("Modelo",
+     "Clase de Python que representa una tabla. <font face='Courier' size=8>Libro</font>, "
+     "<font face='Courier' size=8>Autor</font> y <font face='Courier' size=8>Prestamo</font> "
+     "son modelos; las reseñas <b>no</b>."),
+    ("Migración",
+     "Archivo que describe un cambio en la estructura de la base, para poder aplicarlo de "
+     "forma reproducible. Las genera <font face='Courier' size=8>makemigrations</font>."),
+    ("Excepción propia",
+     "Una clase de error definida por el proyecto, como "
+     "<font face='Courier' size=8>MicroservicioNoDisponible</font>. Permite que la vista "
+     "atrape el problema sin saber nada de <font face='Courier' size=8>urllib</font>."),
+    ("urllib",
+     "Librería de la biblioteca estándar de Python para hacer pedidos HTTP. Se usa en "
+     "lugar de <font face='Courier' size=8>requests</font> para no sumar dependencias."),
+    ("WSGI",
+     "El estándar que conecta un servidor web con una aplicación Python sincrónica. "
+     "<font face='Courier' size=8>biblioteca/wsgi.py</font> expone el objeto "
+     "<font face='Courier' size=8>application</font> que la plataforma ejecuta."),
+])
+
+c += glosario("FastAPI y el microservicio", [
+    ("FastAPI",
+     "Framework de Python para construir APIs. Valida los datos y genera la documentación "
+     "automáticamente a partir de los tipos que se declaran."),
+    ("ASGI",
+     "El equivalente asincrónico de WSGI. FastAPI es una aplicación ASGI; el objeto se "
+     "llama <font face='Courier' size=8>app</font>."),
+    ("Pydantic",
+     "Librería de validación por tipos. <font face='Courier' size=8>ResenaNueva</font> es "
+     "un modelo de Pydantic: cumple el papel de un formulario de Django."),
+    ("APIRouter",
+     "Agrupador de rutas de FastAPI. Con "
+     "<font face='Courier' size=8>APIRouter(prefix=\"/api\")</font> todas las rutas del "
+     "servicio cuelgan de <font face='Courier' size=8>/api</font> sin repetirlo una por una."),
+    ("uvicorn",
+     "El servidor que ejecuta la aplicación ASGI. En local: "
+     "<font face='Courier' size=8>uvicorn main:app --port 8001</font>."),
+    ("Swagger / /docs",
+     "La documentación interactiva que FastAPI genera sola, donde se pueden probar los "
+     "endpoints desde el navegador."),
+])
+
+c.append(PageBreak())
+
+c += glosario("Bases de datos", [
+    ("SQLite",
+     "Base de datos que vive en un único archivo. Perfecta para desarrollo; inservible en "
+     "un servidor sin disco persistente, que es el motivo de haber migrado a PostgreSQL."),
+    ("PostgreSQL",
+     "Motor de base de datos que corre como servicio aparte, en su propio servidor. La "
+     "usan el sitio y el microservicio."),
+    ("Supabase",
+     "Servicio que ofrece PostgreSQL administrado en la nube, más una API HTTP para "
+     "consultarlo. El microservicio usa esa API; Django se conecta al Postgres directo."),
+    ("Connection pooler",
+     "Intermediario que reutiliza conexiones a la base en lugar de abrir una nueva cada "
+     "vez. En Supabase hay que usar el <b>Session pooler</b>: la conexión directa es IPv6 "
+     "y la plataforma no la alcanza."),
+    ("RLS",
+     "<i>Row Level Security</i>. Mecanismo de PostgreSQL que decide, fila por fila, quién "
+     "puede leer o escribir. Acá está activado <b>sin políticas públicas</b>: con la clave "
+     "anónima nadie entra."),
+    ("service_role / anon",
+     "Las dos claves de Supabase. La <font face='Courier' size=8>anon</font> es pública y "
+     "respeta RLS; la <font face='Courier' size=8>service_role</font> lo atraviesa y es "
+     "secreta: vive solo en el servidor."),
+    ("Idempotente",
+     "Que se puede ejecutar varias veces con el mismo resultado. El "
+     "<font face='Courier' size=8>seed.py</font> lo es: correrlo dos veces no duplica datos."),
+])
+
+c += glosario("Despliegue", [
+    ("Serverless",
+     "Modelo donde el código se ejecuta en respuesta a una petición, sin un servidor "
+     "encendido de forma permanente. No hay disco que persista entre pedidos: de ahí que "
+     "SQLite no sirva."),
+    ("Función",
+     "La unidad que se ejecuta en serverless. Toda la aplicación Django se empaqueta en "
+     "una sola función."),
+    ("Cold start",
+     "La demora extra del primer pedido, cuando la función tiene que inicializarse desde "
+     "cero porque no había ninguna instancia despierta."),
+    ("Build",
+     "El proceso que instala dependencias y arma el paquete que se va a ejecutar. Ocurre "
+     "una vez por despliegue, no en cada pedido."),
+    ("Deployment",
+     "Una versión concreta y <b>inmutable</b> del proyecto ya construida. No se modifica: "
+     "cada cambio genera uno nuevo."),
+    ("Alias / dominio",
+     "El nombre público que apunta a un deployment. Un deployment nuevo no se ve hasta que "
+     "el alias lo apunta: si la URL no cambia pese a los cambios, este es el primer lugar "
+     "donde mirar."),
+    ("Promote",
+     "La acción de hacer que los alias apunten a un deployment ya construido."),
+    ("Entrypoint",
+     "El archivo y la variable que la plataforma carga para arrancar la aplicación: "
+     "<font face='Courier' size=8>biblioteca.wsgi:application</font> para el sitio y "
+     "<font face='Courier' size=8>main:app</font> para la API."),
+    ("Rewrite",
+     "Regla que decide, según la ruta pedida, qué servicio la atiende. Las de este "
+     "proyecto mandan <font face='Courier' size=8>/api/*</font> a la API y el resto al sitio."),
+    ("Root Directory",
+     "La carpeta que la plataforma toma como raíz del proyecto. Con Services va vacía, "
+     "porque el reparto lo define <font face='Courier' size=8>vercel.json</font>."),
+    ("Variable de entorno",
+     "Valor que se le pasa al programa desde fuera del código, como una credencial o una "
+     "URL. Permite cambiar la configuración sin tocar ni desplegar código nuevo."),
+    ("collectstatic",
+     "Comando de Django que junta los archivos estáticos en una carpeta para que el "
+     "servidor los sirva. La plataforma lo corre sola durante el build."),
+])
+
 
 SALIDA.parent.mkdir(parents=True, exist_ok=True)
 doc = SimpleDocTemplate(
