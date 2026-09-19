@@ -6,7 +6,6 @@ dependencias externas.
 """
 import json
 import urllib.error
-import urllib.parse
 import urllib.request
 
 from django.conf import settings

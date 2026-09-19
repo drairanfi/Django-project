@@ -71,7 +71,7 @@ def raiz():
 
 @api.get("/salud")
 def salud():
-    """Health check: Render lo usa para saber si el servicio está vivo."""
+    """Health check: la plataforma lo usa para saber si el servicio está vivo."""
     return {"estado": "ok"}
 
 
