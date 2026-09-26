@@ -46,6 +46,12 @@ def obtener_resenas(libro_id):
     return _pedir(url)
 
 
+def obtener_todas_resenas():
+    """Trae todas las reseñas del microservicio: {cantidad, resenas}."""
+    url = f"{settings.MICROSERVICIO_RESENAS_URL}/resenas"
+    return _pedir(url)
+
+
 def crear_resena(libro_id, lector, puntaje, comentario):
     """Envía una reseña nueva al microservicio y devuelve la reseña guardada."""
     url = f"{settings.MICROSERVICIO_RESENAS_URL}/resenas"
@@ -156,6 +162,20 @@ def armar_contexto_biblioteca():
             f"({prestamo.estado}, desde {prestamo.fecha_prestamo})"
         )
 
+    lineas.append("RESENAS:")
+    try:
+        resenas = obtener_todas_resenas().get("resenas", [])
+    except MicroservicioNoDisponible:
+        resenas = []
+    if not resenas:
+        lineas.append("- No hay reseñas cargadas en el microservicio.")
+    else:
+        for resena in resenas:
+            lineas.append(
+                f"- Libro {resena['libro_id']}: {resena['lector']} le puso "
+                f"{resena['puntaje']} ({resena['comentario'] or 'sin comentario'})"
+            )
+
     return "\n".join(lineas)
 
 
@@ -172,8 +192,8 @@ def preguntar_al_asistente(pregunta):
         "inventes datos ni funciones que no estén en el contexto. Podés "
         "responder preguntas sobre qué libros hay, quién los tiene prestados, "
         "cómo funciona un préstamo, cómo se presta o devuelve un libro, cómo "
-        "agregar, editar o eliminar un libro, y qué "
-        "se puede hacer en la app. Si la pregunta no tiene que ver con la "
+        "agregar, editar o eliminar un libro, las reseñas del microservicio "
+        "externo, y qué se puede hacer en la app. Si la pregunta no tiene que ver con la "
         "biblioteca, decí que no podés responderla. Respondé en español, breve "
         "y en el mismo idioma que la pregunta."
     )

@@ -92,18 +92,51 @@ class AsistenteTests(TestCase):
             categoria=categoria,
         )
 
-        contexto = servicios.armar_contexto_biblioteca()
+        with patch("libros.servicios.obtener_todas_resenas", return_value={"resenas": []}):
+            contexto = servicios.armar_contexto_biblioteca()
 
         self.assertIn("LIBROS:", contexto)
         self.assertIn("Ficciones", contexto)
         self.assertIn("categoria Ficción", contexto)
 
     def test_armar_contexto_biblioteca_incluye_el_funcionamiento_de_la_app(self):
-        contexto = servicios.armar_contexto_biblioteca()
+        with patch("libros.servicios.obtener_todas_resenas", return_value={"resenas": []}):
+            contexto = servicios.armar_contexto_biblioteca()
 
         self.assertIn("COMO FUNCIONA UN PRESTAMO:", contexto)
         self.assertIn("disponible", contexto)
         self.assertIn("devolver", contexto)
+
+    def test_armar_contexto_biblioteca_incluye_las_resenas_del_microservicio(self):
+        con_resenas = {
+            "cantidad": 1,
+            "resenas": [
+                {
+                    "id": 1,
+                    "libro_id": 1,
+                    "lector": "Ana Gómez",
+                    "puntaje": 5,
+                    "comentario": "Imperdible",
+                    "creada_en": "2026-09-18T10:00:00+00:00",
+                }
+            ],
+        }
+
+        with patch("libros.servicios.obtener_todas_resenas", return_value=con_resenas):
+            contexto = servicios.armar_contexto_biblioteca()
+
+        self.assertIn("RESENAS:", contexto)
+        self.assertIn("Ana Gómez", contexto)
+        self.assertIn("le puso 5", contexto)
+
+    def test_armar_contexto_biblioteca_degrada_si_el_microservicio_falla(self):
+        fallo = servicios.MicroservicioNoDisponible("timeout")
+
+        with patch("libros.servicios.obtener_todas_resenas", side_effect=fallo):
+            contexto = servicios.armar_contexto_biblioteca()
+
+        self.assertIn("RESENAS:", contexto)
+        self.assertIn("No hay reseñas cargadas", contexto)
 
 
 class CrudLibroTests(TestCase):
