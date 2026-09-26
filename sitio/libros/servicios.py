@@ -162,6 +162,18 @@ def armar_contexto_biblioteca():
             f"({prestamo.estado}, desde {prestamo.fecha_prestamo})"
         )
 
+    lineas.append("MICROSERVICIO DE RESEÑAS:")
+    lineas.append(
+        "Las reseñas de los libros NO viven en la base de datos del sitio: "
+        "viven en un microservicio externo (FastAPI) que usa su propia base "
+        "de datos, PostgreSQL administrada en Supabase. El sitio Django no se "
+        "conecta a esa base directamente: solo conoce la URL pública del "
+        "microservicio y le pide las reseñas por HTTP. Ese endpoint público "
+        "es GET /api/resenas (todas las reseñas) y GET "
+        "/api/libros/{libro_id}/resenas (las de un libro con su promedio). "
+        "Django consume esas reseñas a través del módulo servicios.py."
+    )
+
     lineas.append("RESENAS:")
     try:
         resenas = obtener_todas_resenas().get("resenas", [])
@@ -193,7 +205,7 @@ def preguntar_al_asistente(pregunta):
         "responder preguntas sobre qué libros hay, quién los tiene prestados, "
         "cómo funciona un préstamo, cómo se presta o devuelve un libro, cómo "
         "agregar, editar o eliminar un libro, las reseñas del microservicio "
-        "externo, y qué se puede hacer en la app. Si la pregunta no tiene que ver con la "
+        "externo y su base de datos en Supabase, y qué se puede hacer en la app. Si la pregunta no tiene que ver con la "
         "biblioteca, decí que no podés responderla. Respondé en español, breve "
         "y en el mismo idioma que la pregunta."
     )
