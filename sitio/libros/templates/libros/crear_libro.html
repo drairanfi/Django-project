@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block title %}Agregar libro{% endblock %}
+
+{% block content %}
+    <div>
+        <h2>Agregar un libro nuevo</h2>
+
+        <form method="post">
+            {% csrf_token %}
+            <p>
+                <label for="id_titulo">Título:</label>
+                {{ formulario.titulo }}
+            </p>
+            <p>
+                <label for="id_isbn">ISBN:</label>
+                {{ formulario.isbn }}
+            </p>
+            <p>
+                <label for="id_anio_publicacion">Año de publicación:</label>
+                {{ formulario.anio_publicacion }}
+            </p>
+            <p>
+                <label for="id_paginas">Páginas:</label>
+                {{ formulario.paginas }}
+            </p>
+            <p>
+                <label for="id_disponible">Disponible:</label>
+                {{ formulario.disponible }}
+            </p>
+            <p>
+                <label for="id_categoria">Categoría:</label>
+                {{ formulario.categoria }}
+            </p>
+            <p>
+                <label for="id_categoria_nueva">Categoría nueva (opcional):</label>
+                {{ formulario.categoria_nueva }}
+            </p>
+            <p>
+                <label for="id_autores">Autores:</label>
+                {{ formulario.autores }}
+            </p>
+            <p>
+                <label for="id_autores_nuevos">Autores nuevos (opcional, separados por coma):</label>
+                {{ formulario.autores_nuevos }}
+            </p>
+            {% if formulario.errors %}
+                <ul>
+                    {% for error in formulario.errors.values %}
+                        {% for mensaje in error %}
+                            <li>{{ mensaje }}</li>
+                        {% endfor %}
+                    {% endfor %}
+                </ul>
+            {% endif %}
+            <p><button type="submit">Guardar libro</button></p>
+        </form>
+
+        <p><a href="{% url 'libros:inicio' %}">Volver al catálogo</a></p>
+    </div>
+{% endblock %}

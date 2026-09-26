@@ -18,6 +18,10 @@
         </p>
         <p><strong>Préstamos activos:</strong> {{ prestamos_activos }}</p>
         <p><a href="{% url 'libros:resenas_libro' libro.id %}">Ver reseñas (microservicio externo)</a></p>
+        <p>
+            <a href="{% url 'libros:editar_libro' libro.id %}">Editar</a> |
+            <a href="{% url 'libros:eliminar_libro' libro.id %}">Eliminar</a>
+        </p>
 
         {% if libro.disponible %}
             <a href="{% url 'prestamos:crear_prestamo' libro.id %}">Prestar este libro</a>

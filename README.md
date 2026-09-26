@@ -60,13 +60,13 @@ Un sistema web que permite:
 
 | Requisito | Dónde se cumple en el código | Explicación |
 |---|---|---|
-| **Múltiples vistas en una App** | `sitio/libros/views.py` → 6 vistas (`inicio`, `detalle_libro`, `libros_por_categoria`, `libros_por_autor`, `resenas_libro`, `asistente`) — `sitio/prestamos/views.py` → 5 vistas (`lista_lectores`, `detalle_lector`, `prestamos_por_estado`, `registrar_devolucion`, `crear_prestamo`) | Ambas apps tienen **más de una vista** que responde por distintas URLs. |
+| **Múltiples vistas en una App** | `sitio/libros/views.py` → 9 vistas (`inicio`, `detalle_libro`, `libros_por_categoria`, `libros_por_autor`, `resenas_libro`, `asistente`, `crear_libro`, `editar_libro`, `eliminar_libro`) — `sitio/prestamos/views.py` → 5 vistas (`lista_lectores`, `detalle_lector`, `prestamos_por_estado`, `registrar_devolucion`, `crear_prestamo`) | Ambas apps tienen **más de una vista** que responde por distintas URLs. |
 | **Múltiples Apps en un proyecto** | `sitio/biblioteca/settings.py` → `INSTALLED_APPS` incluye `'libros'` y `'prestamos'` | El proyecto se divide en **2 aplicaciones** con responsabilidades separadas. |
-| **Modelos consultados desde las vistas** | `sitio/libros/views.py:6-53` y `sitio/prestamos/views.py:10-92` usan `Libro.objects.all()`, `Libro.objects.filter(categoria=categoria)`, `get_object_or_404(...)` | Cada vista **consulta la base de datos** a través del ORM y pasa los resultados al template. |
+| **Modelos consultados desde las vistas** | `sitio/libros/views.py:11-60` y `sitio/prestamos/views.py:10-92` usan `Libro.objects.all()`, `Libro.objects.filter(categoria=categoria)`, `get_object_or_404(...)`, y las vistas del CRUD usan `LibroForm` para crear, actualizar y borrar | Cada vista **consulta la base de datos** a través del ORM y pasa los resultados al template. |
 | **Uso de shortcuts de Django** | Las 11 vistas usan `render(...)`; 7 usan `get_object_or_404(...)`. Cero `HttpResponse` crudo, cero `loader.get_template`, cero `raise Http404` manual | `render()` une template + context en una sola respuesta. `get_object_or_404()` evita el `try/except Model.DoesNotExist` a mano y devuelve un 404 real. |
 | **Patrón vista → context → template** | Las 11 vistas declaran una variable `context` explícita antes del `return render(...)` — ver [sección dedicada](#-el-patrón-vista--context--template) | La vista **consume el modelo**, arma un **diccionario `context`** y se lo **envía al template**. El template solo muestra: no consulta la base de datos. |
 | **Rutas dinámicas con parámetros y vistas que hacen algo con esa info** | `sitio/libros/urls.py:9-11` (`<int:libro_id>`, `<int:categoria_id>`, `<int:autor_id>`) y `sitio/prestamos/urls.py:9-12` (`<int:lector_id>`, `<str:estado>`, `<int:libro_id>`, `<int:prestamo_id>`) | Las URLs **capturan parámetros** y las vistas los reciben en su firma para filtrar datos, crear o actualizar registros. |
-| **Una vista consume un microservicio propio en la nube, sobre una base distinta de SQLite** | `sitio/libros/views.py:58` → `resenas_libro()` llama por HTTP a `microservicio_resenas/` (FastAPI en Vercel) a través del cliente `sitio/libros/servicios.py` — ver [sección dedicada](#-microservicio-externo-de-reseñas) | Las reseñas viven en **Supabase (PostgreSQL)**, no en `db.sqlite3`. Django no tiene credenciales de esa base: solo conoce una URL HTTP. |
+| **Una vista consume un microservicio propio en la nube, sobre una base distinta de SQLite** | `sitio/libros/views.py:61` → `resenas_libro()` llama por HTTP a `microservicio_resenas/` (FastAPI en Vercel) a través del cliente `sitio/libros/servicios.py` — ver [sección dedicada](#-microservicio-externo-de-reseñas) | Las reseñas viven en **Supabase (PostgreSQL)**, no en `db.sqlite3`. Django no tiene credenciales de esa base: solo conoce una URL HTTP. |
 
 ### Detalle: rutas dinámicas → cómo fluye la información
 
@@ -108,11 +108,11 @@ Ejemplos de URLs que hacen algo con su parámetro:
 
 ## 🔄 El patrón vista → context → template
 
-Este es el patrón central de Django y el que estructura **las 11 vistas** del proyecto.
+Este es el patrón central de Django y el que estructura **las 14 vistas** del proyecto.
 Siempre son los mismos tres pasos, en el mismo orden:
 
 ```python
-# sitio/libros/views.py:34
+# sitio/libros/views.py:37
 def libros_por_categoria(request, categoria_id):
     """Busca la Categoría y filtra los Libros que le pertenecen."""
 
@@ -175,7 +175,7 @@ proyecto_django_biblioteca/
 │   └── __init__.py
 ├── libros/                    → App 1: catálogo de libros
 │   ├── models.py              → Autor, Categoria, Libro
-│   ├── views.py               → 6 vistas basadas en funciones (patron context)
+│   ├── views.py               → 9 vistas basadas en funciones (patron context)
 │   ├── urls.py                → Rutas de la app libros
 │   ├── admin.py               → Registro de modelos en el admin
 │   ├── migrations/            → Migraciones de la app
@@ -256,12 +256,15 @@ Ese cambio de estado lo hace la **vista** (no el template), con `libro.save()`.
 
 | URL | Vista | Plantilla | Función |
 |---|---|---|---|
-| `/` | `inicio` (`sitio/libros/views.py:8`) | `inicio.html` | Lista todos los libros + disponibles + categorías |
-| `/libro/<int:libro_id>/` | `detalle_libro` (`sitio/libros/views.py:22`) | `detalle_libro.html` | Detalle del libro y sus préstamos activos |
-| `/categoria/<int:categoria_id>/` | `libros_por_categoria` (`sitio/libros/views.py:34`) | `por_categoria.html` | Libros filtrados por categoría |
-| `/autor/<int:autor_id>/` | `libros_por_autor` (`sitio/libros/views.py:46`) | `por_autor.html` | Libros filtrados por autor |
-| `/libro/<int:libro_id>/resenas/` | `resenas_libro` (`sitio/libros/views.py:58`) | `resenas.html` | Reseñas del libro traídas del **microservicio externo** |
-| `/asistente/` | `asistente` (`sitio/libros/views.py:104`) | `asistente.html` | Preguntas sobre el catálogo respondidas por **IA** con el contexto del proyecto |
+| `/` | `inicio` (`sitio/libros/views.py:11`) | `inicio.html` | Lista todos los libros + disponibles + categorías |
+| `/libro/<int:libro_id>/` | `detalle_libro` (`sitio/libros/views.py:25`) | `detalle_libro.html` | Detalle del libro y sus préstamos activos |
+| `/categoria/<int:categoria_id>/` | `libros_por_categoria` (`sitio/libros/views.py:37`) | `por_categoria.html` | Libros filtrados por categoría |
+| `/autor/<int:autor_id>/` | `libros_por_autor` (`sitio/libros/views.py:49`) | `por_autor.html` | Libros filtrados por autor |
+| `/libro/<int:libro_id>/resenas/` | `resenas_libro` (`sitio/libros/views.py:61`) | `resenas.html` | Reseñas del libro traídas del **microservicio externo** |
+| `/libro/nuevo/` | `crear_libro` (`sitio/libros/views.py:147`) | `crear_libro.html` | Formulario para crear un libro (GET = form, POST = guarda y redirige) |
+| `/libro/<int:libro_id>/editar/` | `editar_libro` (`sitio/libros/views.py:164`) | `editar_libro.html` | Formulario prellenado para actualizar (GET = form, POST = guarda y redirige) |
+| `/libro/<int:libro_id>/eliminar/` | `eliminar_libro` (`sitio/libros/views.py:184`) | `eliminar_libro.html` | Confirmación y borrado (GET = confirma, POST = borra y redirige) |
+| `/asistente/` | `asistente` (`sitio/libros/views.py:107`) | `asistente.html` | Preguntas sobre el catálogo respondidas por **IA** con el contexto del proyecto |
 
 ### App `prestamos` (préstamos)
 
@@ -304,6 +307,12 @@ path('prestamos/', include('prestamos.urls')),
 10. **Asistente con IA** — en `/asistente/` se puede preguntar por el catálogo en
     lenguaje natural y la IA responde solo con datos del proyecto, nunca con
     información inventada. Ver [sección dedicada](#-asistente-con-ia).
+11. **Agregar un libro** — en `/libro/nuevo/` un formulario crea un libro, con la
+    opción de escribir una categoría y autores nuevos si no existen todavía.
+12. **Editar un libro** — en `/libro/ID/editar/` el formulario viene prellenado y
+    al guardar redirige al detalle (patrón Post/Redirect/Get del tutorial 4).
+13. **Eliminar un libro** — en `/libro/ID/eliminar/` pide confirmación y avisa si
+    tiene préstamos activos (se borran en cascada); solo el POST borra.
 
 ---
 
@@ -520,7 +529,7 @@ entera.
    salieron los datos: recibe una lista en el context, como cualquier otra vista.
 
 ```python
-# sitio/libros/views.py:58
+# sitio/libros/views.py:61
 def resenas_libro(request, libro_id):
     """Combina un Libro del ORM con sus reseñas traídas del microservicio externo."""
     libro = get_object_or_404(Libro, pk=libro_id)     # ← base local

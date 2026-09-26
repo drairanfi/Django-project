@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block title %}Eliminar {{ libro.titulo }}{% endblock %}
+
+{% block content %}
+    <div>
+        <h2>Eliminar libro</h2>
+        <p>¿Seguro que querés eliminar <strong>{{ libro.titulo }}</strong>?</p>
+        <p>ISBN: {{ libro.isbn }} | Año: {{ libro.anio_publicacion }} | Categoría: {{ libro.categoria.nombre }}</p>
+
+        {% if prestamos_activos > 0 %}
+            <p><strong>Atención:</strong> este libro tiene {{ prestamos_activos }} préstamo(s) activo(s).
+            Al eliminarlo se borran también todos sus préstamos.</p>
+        {% endif %}
+
+        <form method="post">
+            {% csrf_token %}
+            <button type="submit">Eliminar definitivamente</button>
+        </form>
+
+        <p><a href="{% url 'libros:detalle_libro' libro.id %}">Cancelar y volver al detalle</a></p>
+    </div>
+{% endblock %}

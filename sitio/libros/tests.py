@@ -1,9 +1,10 @@
 from unittest.mock import patch
 
 from django.test import TestCase
+from django.urls import reverse
 
 from libros import servicios
-from libros.models import Categoria, Libro
+from libros.models import Autor, Categoria, Libro
 
 
 class ResenasTests(TestCase):
@@ -103,3 +104,97 @@ class AsistenteTests(TestCase):
         self.assertIn("COMO FUNCIONA UN PRESTAMO:", contexto)
         self.assertIn("disponible", contexto)
         self.assertIn("devolver", contexto)
+
+
+class CrudLibroTests(TestCase):
+    """El CRUD de libros: crear, editar y eliminar usando LibroForm."""
+
+    def setUp(self):
+        self.categoria = Categoria.objects.create(nombre="Ficción")
+        self.autor = Autor.objects.create(nombre="Jorge Luis", apellido="Borges")
+        self.libro = Libro.objects.create(
+            titulo="Ficciones",
+            isbn="9788420633997",
+            anio_publicacion=1944,
+            paginas=176,
+            categoria=self.categoria,
+        )
+        self.libro.autores.add(self.autor)
+
+    def test_crear_libro_guarda_y_redirige(self):
+        respuesta = self.client.post(
+            reverse("libros:crear_libro"),
+            {
+                "titulo": "El Aleph",
+                "isbn": "9788420633988",
+                "anio_publicacion": 1949,
+                "paginas": 194,
+                "disponible": "on",
+                "categoria": self.categoria.id,
+                "autores": [self.autor.id],
+            },
+        )
+
+        self.assertRedirects(respuesta, reverse("libros:detalle_libro", args=[2]))
+        libro = Libro.objects.get(isbn="9788420633988")
+        self.assertEqual(libro.titulo, "El Aleph")
+        self.assertEqual(libro.categoria, self.categoria)
+
+    def test_crear_libro_con_categoria_y_autor_nuevos(self):
+        respuesta = self.client.post(
+            reverse("libros:crear_libro"),
+            {
+                "titulo": "Cuentos",
+                "isbn": "9788420633977",
+                "anio_publicacion": 1950,
+                "paginas": 100,
+                "categoria": self.categoria.id,
+                "categoria_nueva": "Policial",
+                "autores": [self.autor.id],
+                "autores_nuevos": "Julio Verne",
+            },
+        )
+
+        self.assertRedirects(respuesta, reverse("libros:detalle_libro", args=[2]))
+        libro = Libro.objects.get(isbn="9788420633977")
+        self.assertEqual(libro.categoria.nombre, "Policial")
+        self.assertTrue(libro.autores.filter(apellido="Verne").exists())
+
+    def test_crear_libro_invalido_muestra_errores_sin_redirigir(self):
+        respuesta = self.client.post(
+            reverse("libros:crear_libro"),
+            {"titulo": "", "isbn": ""},
+        )
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertEqual(Libro.objects.count(), 1)
+
+    def test_editar_libro_actualiza_los_datos(self):
+        respuesta = self.client.post(
+            reverse("libros:editar_libro", args=[self.libro.id]),
+            {
+                "titulo": "Ficciones (edición 2000)",
+                "isbn": self.libro.isbn,
+                "anio_publicacion": 2000,
+                "paginas": 180,
+                "categoria": self.categoria.id,
+                "autores": [self.autor.id],
+            },
+        )
+
+        self.assertRedirects(respuesta, reverse("libros:detalle_libro", args=[self.libro.id]))
+        self.libro.refresh_from_db()
+        self.assertEqual(self.libro.titulo, "Ficciones (edición 2000)")
+        self.assertEqual(self.libro.anio_publicacion, 2000)
+
+    def test_eliminar_libro_get_muestra_confirmacion(self):
+        respuesta = self.client.get(reverse("libros:eliminar_libro", args=[self.libro.id]))
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertContains(respuesta, "Ficciones")
+
+    def test_eliminar_libro_post_borra(self):
+        respuesta = self.client.post(reverse("libros:eliminar_libro", args=[self.libro.id]))
+
+        self.assertRedirects(respuesta, reverse("libros:inicio"))
+        self.assertFalse(Libro.objects.filter(pk=self.libro.id).exists())

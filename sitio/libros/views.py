@@ -1,7 +1,10 @@
 from django.conf import settings
+from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404, render
+from django.urls import reverse
 
 from . import servicios
+from .forms import LibroForm
 from .models import Autor, Categoria, Libro
 
 
@@ -121,3 +124,75 @@ def asistente(request):
         "error": error,
     }
     return render(request, "libros/asistente.html", context)
+
+
+def _crear_categoria_o_autor_que_faltan(formulario, libro):
+    """Crea la categoría y los autores nuevos que vienen del formulario y los asocia al libro."""
+    categoria_nueva = formulario.cleaned_data.get("categoria_nueva")
+    if categoria_nueva:
+        categoria, _ = Categoria.objects.get_or_create(nombre=categoria_nueva.strip())
+        libro.categoria = categoria
+        libro.save()
+
+    autores_nuevos = formulario.cleaned_data.get("autores_nuevos")
+    if autores_nuevos:
+        for nombre_completo in autores_nuevos.split(","):
+            partes = nombre_completo.strip().split(" ")
+            nombre = partes[0]
+            apellido = " ".join(partes[1:]) if len(partes) > 1 else ""
+            autor, _ = Autor.objects.get_or_create(nombre=nombre, apellido=apellido)
+            libro.autores.add(autor)
+
+
+def crear_libro(request):
+    """Muestra el formulario (GET) y crea un Libro nuevo (POST), con categoría y autores."""
+    if request.method == "POST":
+        formulario = LibroForm(request.POST)
+        if formulario.is_valid():
+            libro = formulario.save()
+            _crear_categoria_o_autor_que_faltan(formulario, libro)
+            return HttpResponseRedirect(reverse("libros:detalle_libro", args=[libro.id]))
+    else:
+        formulario = LibroForm()
+
+    context = {
+        "formulario": formulario,
+    }
+    return render(request, "libros/crear_libro.html", context)
+
+
+def editar_libro(request, libro_id):
+    """Muestra el formulario prellenado (GET) y actualiza el Libro (POST)."""
+    libro = get_object_or_404(Libro, pk=libro_id)
+
+    if request.method == "POST":
+        formulario = LibroForm(request.POST, instance=libro)
+        if formulario.is_valid():
+            formulario.save()
+            _crear_categoria_o_autor_que_faltan(formulario, libro)
+            return HttpResponseRedirect(reverse("libros:detalle_libro", args=[libro.id]))
+    else:
+        formulario = LibroForm(instance=libro)
+
+    context = {
+        "formulario": formulario,
+        "libro": libro,
+    }
+    return render(request, "libros/editar_libro.html", context)
+
+
+def eliminar_libro(request, libro_id):
+    """Muestra la confirmación (GET) y borra el Libro con sus préstamos en cascada (POST)."""
+    libro = get_object_or_404(Libro, pk=libro_id)
+
+    if request.method == "POST":
+        libro.delete()
+        return HttpResponseRedirect(reverse("libros:inicio"))
+
+    prestamos_activos = libro.prestamos.filter(estado="activo").count()
+
+    context = {
+        "libro": libro,
+        "prestamos_activos": prestamos_activos,
+    }
+    return render(request, "libros/eliminar_libro.html", context)
