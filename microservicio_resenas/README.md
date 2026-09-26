@@ -49,7 +49,9 @@ Ejemplo de respuesta de `GET /libros/1/resenas`:
 }
 ```
 
-FastAPI genera la documentación interactiva sola: `/docs`.
+FastAPI genera la documentación interactiva (swagger) sola, colgada de `/api`
+como el resto de las rutas: `/api/docs` para Swagger UI y `/api/openapi.json`
+para el esquema OpenAPI.
 
 ## Paso 1 — Crear la base en Supabase
 
@@ -82,7 +84,7 @@ desde el archivo en local:
 set -a; . ./.env; set +a                             # exporta todo lo del .env
 
 venv/bin/python seed.py                              # datos de ejemplo (idempotente)
-venv/bin/uvicorn main:app --reload --port 8001       # http://127.0.0.1:8001/docs
+venv/bin/uvicorn main:app --reload --port 8001       # http://127.0.0.1:8001/api/docs
 ```
 
 `.env` está en el `.gitignore`: la `service_role` key nunca se versiona.

@@ -31,10 +31,16 @@ SUPABASE_SERVICE_KEY = variable_obligatoria("SUPABASE_SERVICE_KEY")
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
+# La documentación interactiva (swagger) también vive bajo /api, igual que las
+# rutas: el sitio ocupa / y este servicio /api, así que /docs en la raíz no le
+# llegaría nunca en el despliegue compartido.
 app = FastAPI(
     title="Microservicio de Reseñas",
     description="API de reseñas de libros almacenadas en Supabase.",
     version="1.0.0",
+    docs_url="/api/docs",
+    redoc_url="/api/redoc",
+    openapi_url="/api/openapi.json",
 )
 
 # Todas las rutas cuelgan de /api porque el servicio comparte dominio con el
@@ -65,6 +71,7 @@ def raiz():
             "GET /api/resenas",
             "GET /api/libros/{libro_id}/resenas",
             "POST /api/resenas",
+            "GET /api/docs (swagger)",
         ],
     }
 
