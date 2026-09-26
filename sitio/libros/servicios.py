@@ -188,6 +188,18 @@ def armar_contexto_biblioteca():
                 f"{resena['puntaje']} ({resena['comentario'] or 'sin comentario'})"
             )
 
+    lineas.append("JSON DEL ENDPOINT PUBLICO DE RESEÑAS:")
+    lineas.append(
+        "Cuando te pregunten por consultas a la base de datos o por el JSON que "
+        "devuelve el microservicio, mostrá el contenido de este endpoint público: "
+        f"{settings.MICROSERVICIO_RESENAS_URL}/libros/1/resenas"
+    )
+    try:
+        json_resenas = obtener_resenas(1)
+        lineas.append(json.dumps(json_resenas, ensure_ascii=False, indent=2))
+    except MicroservicioNoDisponible:
+        lineas.append("(el microservicio no está disponible para mostrar el JSON)")
+
     return "\n".join(lineas)
 
 
@@ -205,7 +217,10 @@ def preguntar_al_asistente(pregunta):
         "responder preguntas sobre qué libros hay, quién los tiene prestados, "
         "cómo funciona un préstamo, cómo se presta o devuelve un libro, cómo "
         "agregar, editar o eliminar un libro, las reseñas del microservicio "
-        "externo y su base de datos en Supabase, y qué se puede hacer en la app. Si la pregunta no tiene que ver con la "
+        "externo y su base de datos en Supabase, y qué se puede hacer en la app. "
+        "Si te preguntan por una consulta a la base de datos o por el JSON que "
+        "devuelve el microservicio, reproducí el contenido del bloque "
+        "JSON DEL ENDPOINT PUBLICO DE RESEÑAS del contexto, tal cual está. Si la pregunta no tiene que ver con la "
         "biblioteca, decí que no podés responderla. Respondé en español, breve "
         "y en el mismo idioma que la pregunta."
     )

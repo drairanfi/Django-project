@@ -92,7 +92,9 @@ class AsistenteTests(TestCase):
             categoria=categoria,
         )
 
-        with patch("libros.servicios.obtener_todas_resenas", return_value={"resenas": []}):
+        with patch("libros.servicios.obtener_todas_resenas", return_value={"resenas": []}), patch(
+            "libros.servicios.obtener_resenas", return_value={}
+        ):
             contexto = servicios.armar_contexto_biblioteca()
 
         self.assertIn("LIBROS:", contexto)
@@ -100,7 +102,9 @@ class AsistenteTests(TestCase):
         self.assertIn("categoria Ficción", contexto)
 
     def test_armar_contexto_biblioteca_incluye_el_funcionamiento_de_la_app(self):
-        with patch("libros.servicios.obtener_todas_resenas", return_value={"resenas": []}):
+        with patch("libros.servicios.obtener_todas_resenas", return_value={"resenas": []}), patch(
+            "libros.servicios.obtener_resenas", return_value={}
+        ):
             contexto = servicios.armar_contexto_biblioteca()
 
         self.assertIn("COMO FUNCIONA UN PRESTAMO:", contexto)
@@ -122,7 +126,9 @@ class AsistenteTests(TestCase):
             ],
         }
 
-        with patch("libros.servicios.obtener_todas_resenas", return_value=con_resenas):
+        with patch("libros.servicios.obtener_todas_resenas", return_value=con_resenas), patch(
+            "libros.servicios.obtener_resenas", return_value={}
+        ):
             contexto = servicios.armar_contexto_biblioteca()
 
         self.assertIn("RESENAS:", contexto)
@@ -132,11 +138,38 @@ class AsistenteTests(TestCase):
     def test_armar_contexto_biblioteca_degrada_si_el_microservicio_falla(self):
         fallo = servicios.MicroservicioNoDisponible("timeout")
 
-        with patch("libros.servicios.obtener_todas_resenas", side_effect=fallo):
+        with patch("libros.servicios.obtener_todas_resenas", side_effect=fallo), patch(
+            "libros.servicios.obtener_resenas", side_effect=fallo
+        ):
             contexto = servicios.armar_contexto_biblioteca()
 
         self.assertIn("RESENAS:", contexto)
         self.assertIn("No hay reseñas cargadas", contexto)
+
+    def test_armar_contexto_biblioteca_incluye_el_json_del_endpoint(self):
+        con_resenas = {
+            "cantidad": 1,
+            "promedio": 5.0,
+            "resenas": [
+                {
+                    "id": 1,
+                    "libro_id": 1,
+                    "lector": "Ana Gómez",
+                    "puntaje": 5,
+                    "comentario": "Imperdible",
+                    "creada_en": "2026-09-18T10:00:00+00:00",
+                }
+            ],
+        }
+
+        with patch("libros.servicios.obtener_todas_resenas", return_value={"resenas": []}), patch(
+            "libros.servicios.obtener_resenas", return_value=con_resenas
+        ):
+            contexto = servicios.armar_contexto_biblioteca()
+
+        self.assertIn("JSON DEL ENDPOINT PUBLICO DE RESEÑAS:", contexto)
+        self.assertIn('"libro_id": 1', contexto)
+        self.assertIn('"promedio"', contexto)
 
 
 class CrudLibroTests(TestCase):
