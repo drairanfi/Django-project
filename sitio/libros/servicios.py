@@ -96,6 +96,41 @@ def armar_contexto_biblioteca():
     lineas.append("- Registrar y devolver préstamos, y verlos por estado.")
     lineas.append("- Ver el historial de préstamos de cada lector.")
 
+    lineas.append("COMO AGREGAR UN LIBRO:")
+    lineas.append(
+        "Desde el enlace 'Agregar libro' del catálogo se abre un formulario "
+        "con los campos del libro: título, ISBN, año de publicación, páginas, "
+        "disponible, categoría y autores. Se puede elegir una categoría "
+        "existente o escribir una nueva en el campo 'Categoría nueva'. Lo mismo "
+        "con los autores: se marcan los existentes o se escriben nuevos "
+        "separados por coma en el campo 'Autores nuevos'. Al guardar, el libro "
+        "se crea con su categoría y autores (los que no existían se crean solos) "
+        "y se redirige al detalle del libro nuevo. El ISBN no se puede repetir: "
+        "si ya existe otro libro con el mismo ISBN, el formulario muestra un error."
+    )
+
+    lineas.append("COMO EDITAR UN LIBRO:")
+    lineas.append(
+        "Desde el detalle de un libro, el enlace 'Editar' abre el mismo "
+        "formulario pero prellenado con los datos actuales del libro. Se pueden "
+        "cambiar cualquiera de los campos: título, ISBN, año, páginas, estado "
+        "de disponibilidad, categoría, autores, y agregar categoría o autores "
+        "nuevos igual que en el alta. Al guardar, los cambios se aplican y se "
+        "vuelve al detalle del libro con los datos actualizados. El ISBN "
+        "tampoco puede repetirse acá: si se intenta poner el ISBN de otro "
+        "libro existente, el formulario muestra un error."
+    )
+
+    lineas.append("COMO ELIMINAR UN LIBRO:")
+    lineas.append(
+        "Desde el detalle de un libro, el enlace 'Eliminar' abre una página de "
+        "confirmación que muestra los datos del libro. Si el libro tiene "
+        "préstamos activos, avisa que al eliminarlo se borran también todos sus "
+        "préstamos. El libro solo se borra cuando se confirma el formulario de "
+        "la página de confirmación; después se vuelve al catálogo. Un libro "
+        "eliminado desaparece del catálogo y ya no se puede ver ni prestar."
+    )
+
     lineas.append("DATOS ACTUALES DEL PROYECTO:")
     lineas.append("LIBROS:")
     for libro in Libro.objects.all():
@@ -136,7 +171,8 @@ def preguntar_al_asistente(pregunta):
         "el contexto (el funcionamiento de la app y sus datos actuales), nunca "
         "inventes datos ni funciones que no estén en el contexto. Podés "
         "responder preguntas sobre qué libros hay, quién los tiene prestados, "
-        "cómo funciona un préstamo, cómo se presta o devuelve un libro, y qué "
+        "cómo funciona un préstamo, cómo se presta o devuelve un libro, cómo "
+        "agregar, editar o eliminar un libro, y qué "
         "se puede hacer en la app. Si la pregunta no tiene que ver con la "
         "biblioteca, decí que no podés responderla. Respondé en español, breve "
         "y en el mismo idioma que la pregunta."
