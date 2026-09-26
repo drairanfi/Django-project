@@ -22,14 +22,20 @@ class IANoDisponible(Exception):
     """La API de IA no respondió, tardó demasiado o falta la clave en biblioteca/.env."""
 
 
-def _pedir(url, datos=None, timeout=5, error_cls=MicroservicioNoDisponible):
+def _pedir(url, datos=None, timeout=5, error_cls=MicroservicioNoDisponible, cabeceras_extra=None):
     """Hace la petición HTTP y devuelve el JSON ya parseado."""
     cuerpo = None
-    cabeceras = {"Accept": "application/json"}
+    cabeceras = {
+        "Accept": "application/json",
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
+    }
 
     if datos is not None:
         cuerpo = json.dumps(datos).encode("utf-8")
         cabeceras["Content-Type"] = "application/json"
+
+    if cabeceras_extra:
+        cabeceras.update(cabeceras_extra)
 
     peticion = urllib.request.Request(url, data=cuerpo, headers=cabeceras)
 
@@ -226,19 +232,40 @@ def preguntar_al_asistente(pregunta):
     )
 
     # Gemini recibe la clave como parámetro de la URL y las instrucciones en
-    # "contents", no en "messages" como OpenAI.
-    url = f"{settings.IA_API_URL}/models/{settings.IA_MODEL}:generateContent?key={settings.IA_API_KEY}"
-    datos = {
-        "contents": [
-            {
-                "parts": [
-                    {"text": mensaje_sistema},
-                    {"text": f"CONTEXTO DEL PROYECTO:\n{contexto}\n\nPREGUNTA: {pregunta}"},
-                ]
-            }
-        ],
-        "generationConfig": {"temperature": 0.2},
-    }
+    # "contents", no en "messages" como OpenAI. El gateway de opencode-go usa
+    # el formato OpenAI (chat/completions, Authorization, x-opencode-session).
+    es_gemini = "generativelanguage.googleapis.com" in settings.IA_API_URL
 
-    respuesta = _pedir(url, datos, timeout=settings.IA_TIMEOUT, error_cls=IANoDisponible)
-    return respuesta["candidates"][0]["content"]["parts"][0]["text"].strip()
+    if es_gemini:
+        url = f"{settings.IA_API_URL}/models/{settings.IA_MODEL}:generateContent?key={settings.IA_API_KEY}"
+        datos = {
+            "contents": [
+                {
+                    "parts": [
+                        {"text": mensaje_sistema},
+                        {"text": f"CONTEXTO DEL PROYECTO:\n{contexto}\n\nPREGUNTA: {pregunta}"},
+                    ]
+                }
+            ],
+            "generationConfig": {"temperature": 0.2},
+        }
+        respuesta = _pedir(url, datos, timeout=settings.IA_TIMEOUT, error_cls=IANoDisponible)
+        return respuesta["candidates"][0]["content"]["parts"][0]["text"].strip()
+
+    url = f"{settings.IA_API_URL}/chat/completions"
+    cabeceras = {"Authorization": f"Bearer {settings.IA_API_KEY}"}
+    if settings.IA_API_SESION:
+        cabeceras["x-opencode-session"] = settings.IA_API_SESION
+    datos = {
+        "model": settings.IA_MODEL,
+        "messages": [
+            {"role": "system", "content": mensaje_sistema},
+            {"role": "user", "content": f"CONTEXTO DEL PROYECTO:\n{contexto}\n\nPREGUNTA: {pregunta}"},
+        ],
+        "temperature": 0.2,
+    }
+    respuesta = _pedir(
+        url, datos, timeout=settings.IA_TIMEOUT, error_cls=IANoDisponible,
+        cabeceras_extra=cabeceras,
+    )
+    return respuesta["choices"][0]["message"]["content"].strip()

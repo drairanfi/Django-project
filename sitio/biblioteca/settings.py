@@ -226,4 +226,6 @@ IA_API_URL = os.environ.get('IA_API_URL') or _ENV_LOCAL.get(
     'IA_API_URL', 'https://generativelanguage.googleapis.com/v1beta',
 )
 IA_MODEL = os.environ.get('IA_MODEL') or _ENV_LOCAL.get('IA_MODEL', 'gemini-2.5-flash')
+# Sesión que pide el gateway de opencode-go para enrutar. Solo se usa con ese proveedor.
+IA_API_SESION = os.environ.get('IA_API_SESION') or _ENV_LOCAL.get('IA_API_SESION', '')
 IA_TIMEOUT = 15  # segundos: una consulta de IA tarda más que el microservicio
