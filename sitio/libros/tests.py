@@ -51,3 +51,55 @@ class ResenasTests(TestCase):
 
         self.assertEqual(respuesta.status_code, 200)
         self.assertContains(respuesta, "no está disponible")
+
+
+class AsistenteTests(TestCase):
+    """La vista del asistente consulta una API externa: hay que probar los dos casos."""
+
+    def test_muestra_la_respuesta_que_devuelve_la_ia(self):
+        with patch(
+            "libros.servicios.preguntar_al_asistente",
+            return_value="Hay 3 libros de Ficción.",
+        ):
+            respuesta = self.client.post(
+                "/asistente/",
+                {"pregunta": "¿Cuántos libros de ficción hay?"},
+            )
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertContains(respuesta, "Hay 3 libros de Ficción.")
+
+    def test_si_la_ia_no_responde_la_pagina_igual_carga(self):
+        fallo = servicios.IANoDisponible("timeout")
+
+        with patch("libros.servicios.preguntar_al_asistente", side_effect=fallo):
+            respuesta = self.client.post(
+                "/asistente/",
+                {"pregunta": "¿Qué libros hay?"},
+            )
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertContains(respuesta, "No se pudo consultar a la IA")
+
+    def test_armar_contexto_biblioteca_incluye_los_datos_del_orm(self):
+        categoria = Categoria.objects.create(nombre="Ficción")
+        libro = Libro.objects.create(
+            titulo="Ficciones",
+            isbn="9788420633997",
+            anio_publicacion=1944,
+            paginas=176,
+            categoria=categoria,
+        )
+
+        contexto = servicios.armar_contexto_biblioteca()
+
+        self.assertIn("LIBROS:", contexto)
+        self.assertIn("Ficciones", contexto)
+        self.assertIn("categoria Ficción", contexto)
+
+    def test_armar_contexto_biblioteca_incluye_el_funcionamiento_de_la_app(self):
+        contexto = servicios.armar_contexto_biblioteca()
+
+        self.assertIn("COMO FUNCIONA UN PRESTAMO:", contexto)
+        self.assertIn("disponible", contexto)
+        self.assertIn("devolver", contexto)

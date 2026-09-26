@@ -99,3 +99,25 @@ def resenas_libro(request, libro_id):
 
     # 3. enviarlo al template
     return render(request, "libros/resenas.html", context)
+
+
+def asistente(request):
+    """Muestra el formulario (GET) y consulta la IA con el contexto del proyecto (POST)."""
+    respuesta = ""
+    error = ""
+
+    if request.method == "POST":
+        pregunta = request.POST.get("pregunta", "").strip()
+        if not pregunta:
+            error = "Escribí una pregunta primero"
+        else:
+            try:
+                respuesta = servicios.preguntar_al_asistente(pregunta)
+            except servicios.IANoDisponible as fallo:
+                error = f"No se pudo consultar a la IA ({fallo})"
+
+    context = {
+        "respuesta": respuesta,
+        "error": error,
+    }
+    return render(request, "libros/asistente.html", context)

@@ -197,3 +197,33 @@ def _url_del_microservicio():
 MICROSERVICIO_RESENAS_URL = _url_del_microservicio().rstrip('/')
 
 MICROSERVICIO_RESENAS_TIMEOUT = 5  # segundos
+
+
+# Asistente con IA
+# La clave de la API vive en biblioteca/.env, que settings lee solo. Si la
+# variable de entorno ya está definida (por ejemplo en Vercel), gana esa y el
+# archivo no hace falta. Sin clave, la vista del asistente degrada con un aviso.
+
+def _leer_env_local():
+    """Lee las variables del .env de esta carpeta y las devuelve en un dict."""
+    ruta = Path(__file__).resolve().parent / '.env'
+    variables = {}
+    if not ruta.exists():
+        return variables
+    for linea in ruta.read_text(encoding='utf-8').splitlines():
+        linea = linea.strip()
+        if not linea or linea.startswith('#') or '=' not in linea:
+            continue
+        nombre, _, valor = linea.partition('=')
+        variables[nombre.strip()] = valor.strip().strip("'\"")
+    return variables
+
+
+_ENV_LOCAL = _leer_env_local()
+
+IA_API_KEY = os.environ.get('IA_API_KEY') or _ENV_LOCAL.get('IA_API_KEY', '')
+IA_API_URL = os.environ.get('IA_API_URL') or _ENV_LOCAL.get(
+    'IA_API_URL', 'https://generativelanguage.googleapis.com/v1beta',
+)
+IA_MODEL = os.environ.get('IA_MODEL') or _ENV_LOCAL.get('IA_MODEL', 'gemini-2.5-flash')
+IA_TIMEOUT = 15  # segundos: una consulta de IA tarda más que el microservicio

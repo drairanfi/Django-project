@@ -41,6 +41,9 @@ versionado (`.gitignore` excluye `venv/`, `db.sqlite3`, `.env` y `staticfiles/`)
 El archivo `.env` de la raíz tiene la configuración local de **los dos** servicios.
 Se carga en la shell con `set -a; . ../.env; set +a`.
 
+La clave del **asistente con IA** va aparte, en `sitio/biblioteca/.env`, porque
+`settings.py` la lee solo (no hace falta cargarla en la shell).
+
 ```bash
 cd sitio
 python3 -m venv venv                     # solo la primera vez
@@ -138,7 +141,8 @@ vercel.json             define los dos servicios y el enrutado por dominio
 
 sitio/                  SERVICIO 1 - el sitio web (Django)
   biblioteca/           configuración del proyecto (settings, urls raíz)
-  libros/               app 1: Autor, Categoria, Libro → 5 vistas
+    .env                clave de la API de IA (no se versiona)
+  libros/               app 1: Autor, Categoria, Libro → 6 vistas (incluye asistente IA)
   prestamos/            app 2: Lector, Prestamo → 5 vistas
   templates/            base.html (compartido)
   requirements.txt      dependencias del sitio
@@ -192,6 +196,11 @@ de entorno y cae a valores de desarrollo cuando no están.
 | `DJANGO_SECRET_KEY` | la clave de desarrollo | la clave del servidor |
 | `DJANGO_DEBUG` | `True` | `False` si vale otra cosa |
 | `MICROSERVICIO_RESENAS_URL` | `http://127.0.0.1:8001` | la URL del servicio desplegado |
+| `IA_API_KEY` | el asistente avisa que no hay clave | la IA responde preguntas del catálogo |
+
+`IA_API_KEY` (y opcionalmente `IA_API_URL` e `IA_MODEL`) se leen de
+`sitio/biblioteca/.env`, que `settings.py` parsea solo, sin dependencias. En
+Vercel se cargan como variables de entorno: el archivo no se despliega.
 
 Reglas:
 
@@ -225,7 +234,7 @@ Detalles que importan:
 
 ### Variables que hay que cargar en Vercel
 
-Settings → Environment Variables, las cinco, en Production, Preview y Development:
+Settings → Environment Variables, en Production, Preview y Development:
 
 | Variable | Valor |
 |---|---|
@@ -234,9 +243,14 @@ Settings → Environment Variables, las cinco, en Production, Preview y Developm
 | `DJANGO_DEBUG` | `False` |
 | `SUPABASE_URL` | Project URL de Supabase |
 | `SUPABASE_SERVICE_KEY` | la `service_role` key, no la `anon` |
+| `IA_API_KEY` | la clave de Google AI Studio (opcional: sin ella, el asistente avisa que no hay clave) |
 
 `MICROSERVICIO_RESENAS_URL` **no se carga**: Django la deduce del dominio del
 proyecto. Solo se define para apuntar a un servicio distinto.
+
+La `IA_API_KEY` se lee de una variable de entorno en Vercel: el archivo
+`sitio/biblioteca/.env` no se despliega. Sin la variable, el asistente muestra
+un aviso en vez de fallar; el resto del sitio no se entera.
 
 La connection string tiene que ser la del **Session pooler**
 (`aws-0-*.pooler.supabase.com`). La conexión directa (`db.*.supabase.co`) es

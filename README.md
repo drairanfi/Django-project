@@ -23,7 +23,8 @@ de libros, autores, categorías, lectores y el préstamo/devolución de ejemplar
 12. [Panel de administración](#-panel-de-administración)
 13. [Tests](#-tests)
 14. [Microservicio externo de reseñas](#-microservicio-externo-de-reseñas)
-15. [Tecnologías utilizadas](#-tecnologías-utilizadas)
+15. [Asistente con IA](#-asistente-con-ia)
+16. [Tecnologías utilizadas](#-tecnologías-utilizadas)
 
 ---
 
@@ -59,11 +60,11 @@ Un sistema web que permite:
 
 | Requisito | Dónde se cumple en el código | Explicación |
 |---|---|---|
-| **Múltiples vistas en una App** | `sitio/libros/views.py` → 5 vistas (`inicio`, `detalle_libro`, `libros_por_categoria`, `libros_por_autor`, `resenas_libro`) — `sitio/prestamos/views.py` → 5 vistas (`lista_lectores`, `detalle_lector`, `prestamos_por_estado`, `registrar_devolucion`, `crear_prestamo`) | Ambas apps tienen **más de una vista** que responde por distintas URLs. |
+| **Múltiples vistas en una App** | `sitio/libros/views.py` → 6 vistas (`inicio`, `detalle_libro`, `libros_por_categoria`, `libros_por_autor`, `resenas_libro`, `asistente`) — `sitio/prestamos/views.py` → 5 vistas (`lista_lectores`, `detalle_lector`, `prestamos_por_estado`, `registrar_devolucion`, `crear_prestamo`) | Ambas apps tienen **más de una vista** que responde por distintas URLs. |
 | **Múltiples Apps en un proyecto** | `sitio/biblioteca/settings.py` → `INSTALLED_APPS` incluye `'libros'` y `'prestamos'` | El proyecto se divide en **2 aplicaciones** con responsabilidades separadas. |
 | **Modelos consultados desde las vistas** | `sitio/libros/views.py:6-53` y `sitio/prestamos/views.py:10-92` usan `Libro.objects.all()`, `Libro.objects.filter(categoria=categoria)`, `get_object_or_404(...)` | Cada vista **consulta la base de datos** a través del ORM y pasa los resultados al template. |
-| **Uso de shortcuts de Django** | Las 10 vistas usan `render(...)`; 7 usan `get_object_or_404(...)`. Cero `HttpResponse` crudo, cero `loader.get_template`, cero `raise Http404` manual | `render()` une template + context en una sola respuesta. `get_object_or_404()` evita el `try/except Model.DoesNotExist` a mano y devuelve un 404 real. |
-| **Patrón vista → context → template** | Las 10 vistas declaran una variable `context` explícita antes del `return render(...)` — ver [sección dedicada](#-el-patrón-vista--context--template) | La vista **consume el modelo**, arma un **diccionario `context`** y se lo **envía al template**. El template solo muestra: no consulta la base de datos. |
+| **Uso de shortcuts de Django** | Las 11 vistas usan `render(...)`; 7 usan `get_object_or_404(...)`. Cero `HttpResponse` crudo, cero `loader.get_template`, cero `raise Http404` manual | `render()` une template + context en una sola respuesta. `get_object_or_404()` evita el `try/except Model.DoesNotExist` a mano y devuelve un 404 real. |
+| **Patrón vista → context → template** | Las 11 vistas declaran una variable `context` explícita antes del `return render(...)` — ver [sección dedicada](#-el-patrón-vista--context--template) | La vista **consume el modelo**, arma un **diccionario `context`** y se lo **envía al template**. El template solo muestra: no consulta la base de datos. |
 | **Rutas dinámicas con parámetros y vistas que hacen algo con esa info** | `sitio/libros/urls.py:9-11` (`<int:libro_id>`, `<int:categoria_id>`, `<int:autor_id>`) y `sitio/prestamos/urls.py:9-12` (`<int:lector_id>`, `<str:estado>`, `<int:libro_id>`, `<int:prestamo_id>`) | Las URLs **capturan parámetros** y las vistas los reciben en su firma para filtrar datos, crear o actualizar registros. |
 | **Una vista consume un microservicio propio en la nube, sobre una base distinta de SQLite** | `sitio/libros/views.py:58` → `resenas_libro()` llama por HTTP a `microservicio_resenas/` (FastAPI en Vercel) a través del cliente `sitio/libros/servicios.py` — ver [sección dedicada](#-microservicio-externo-de-reseñas) | Las reseñas viven en **Supabase (PostgreSQL)**, no en `db.sqlite3`. Django no tiene credenciales de esa base: solo conoce una URL HTTP. |
 
@@ -107,7 +108,7 @@ Ejemplos de URLs que hacen algo con su parámetro:
 
 ## 🔄 El patrón vista → context → template
 
-Este es el patrón central de Django y el que estructura **las 9 vistas** del proyecto.
+Este es el patrón central de Django y el que estructura **las 11 vistas** del proyecto.
 Siempre son los mismos tres pasos, en el mismo orden:
 
 ```python
@@ -174,7 +175,7 @@ proyecto_django_biblioteca/
 │   └── __init__.py
 ├── libros/                    → App 1: catálogo de libros
 │   ├── models.py              → Autor, Categoria, Libro
-│   ├── views.py               → 4 vistas basadas en funciones (patron context)
+│   ├── views.py               → 6 vistas basadas en funciones (patron context)
 │   ├── urls.py                → Rutas de la app libros
 │   ├── admin.py               → Registro de modelos en el admin
 │   ├── migrations/            → Migraciones de la app
@@ -260,6 +261,7 @@ Ese cambio de estado lo hace la **vista** (no el template), con `libro.save()`.
 | `/categoria/<int:categoria_id>/` | `libros_por_categoria` (`sitio/libros/views.py:34`) | `por_categoria.html` | Libros filtrados por categoría |
 | `/autor/<int:autor_id>/` | `libros_por_autor` (`sitio/libros/views.py:46`) | `por_autor.html` | Libros filtrados por autor |
 | `/libro/<int:libro_id>/resenas/` | `resenas_libro` (`sitio/libros/views.py:58`) | `resenas.html` | Reseñas del libro traídas del **microservicio externo** |
+| `/asistente/` | `asistente` (`sitio/libros/views.py:104`) | `asistente.html` | Preguntas sobre el catálogo respondidas por **IA** con el contexto del proyecto |
 
 ### App `prestamos` (préstamos)
 
@@ -299,6 +301,9 @@ path('prestamos/', include('prestamos.urls')),
    cuando corresponde.
 9. **Administrar datos** — el panel de Django (`/admin/`) permite CRUD completo de
    todos los modelos con búsqueda y filtros.
+10. **Asistente con IA** — en `/asistente/` se puede preguntar por el catálogo en
+    lenguaje natural y la IA responde solo con datos del proyecto, nunca con
+    información inventada. Ver [sección dedicada](#-asistente-con-ia).
 
 ---
 
@@ -434,6 +439,10 @@ El proyecto incluye tests automáticos en `sitio/prestamos/tests.py` y `sitio/li
 | `test_prestar_y_devolver` | El flujo completo: prestar → libro no disponible → devolver → libro disponible |
 | `test_muestra_las_resenas_que_devuelve_el_microservicio` | La vista de reseñas renderiza lo que responde el servicio externo |
 | `test_si_el_microservicio_no_responde_la_pagina_igual_carga` | Si el microservicio falla, la vista responde 200 con un aviso — nunca un 500 |
+| `test_muestra_la_respuesta_que_devuelve_la_ia` | La vista del asistente renderiza lo que responde la API de IA |
+| `test_si_la_ia_no_responde_la_pagina_igual_carga` | Si la IA falla o falta la clave, la vista responde 200 con un aviso |
+| `test_armar_contexto_biblioteca_incluye_los_datos_del_orm` | El contexto que se le pasa a la IA trae los libros de la base |
+| `test_armar_contexto_biblioteca_incluye_el_funcionamiento_de_la_app` | El contexto de la IA describe cómo funciona un préstamo |
 
 Para correrlos:
 
@@ -444,14 +453,14 @@ python manage.py test
 Salida esperada:
 
 ```
-Found 5 test(s).
+Found 9 test(s).
 System check identified no issues (0 silenced).
 OK
 ```
 
-Los dos tests de reseñas usan `unittest.mock.patch` sobre `libros.servicios`:
-**no hacen llamadas de red reales**. Un test que dependa de un servicio remoto
-falla cuando se cae internet, y eso no es una falla del código.
+Los tests de reseñas y del asistente usan `unittest.mock.patch` sobre
+`libros.servicios`: **no hacen llamadas de red reales**. Un test que dependa de
+un servicio remoto falla cuando se cae internet, y eso no es una falla del código.
 
 ### Chequeo rápido sin correr el servidor
 
@@ -614,6 +623,62 @@ Dos detalles que rompen el despliegue si se pasan por alto:
 
 Django deduce la URL de la API desde `VERCEL_URL`, que Vercel define solo: como
 comparten dominio, no hay que configurar nada.
+
+---
+
+## 🤖 Asistente con IA
+
+La vista `/asistente/` integra una **API de IA** que responde preguntas en
+lenguaje natural sobre la biblioteca: qué libros hay, de qué autor, cuáles están
+disponibles, qué préstamos están activos, etc.
+
+### Cómo hace la IA para "solo responder del proyecto"
+
+No se le pregunta a la IA sin contexto: antes de llamarla, la vista arma un
+**texto con los datos reales del proyecto** (libros, categorías, autores,
+lectores y préstamos leídos del ORM) y se lo manda junto con la pregunta. El
+mensaje del sistema le ordena responder **solo con esa información** y avisar
+cuando la pregunta no tenga que ver con la biblioteca.
+
+```
+Usuario pregunta → vista asistente()
+                     │  armar_contexto_biblioteca()  (libros, lectores, prestamos)
+                     ▼
+              API de IA: system = "respondé solo con el contexto del proyecto"
+                         user   = contexto + pregunta
+                     ▼
+              respuesta (o aviso si no hay clave / no responde)
+```
+
+### Las tres capas, igual que con el microservicio
+
+1. **`sitio/libros/servicios.py`** — el cliente HTTP. `armar_contexto_biblioteca()`
+   arma el texto del catálogo y `preguntar_al_asistente()` lo envía a la API.
+   Usa `urllib`, con timeout, y traduce cualquier falla a `IANoDisponible`.
+2. **`sitio/libros/views.py` → `asistente()`** — la vista. Mismo patrón de
+   siempre: consume datos, arma el `context`, lo manda al template.
+3. **`sitio/libros/templates/libros/asistente.html`** — el template: un
+   formulario con una pregunta y el lugar donde se muestra la respuesta.
+
+### Configuración
+
+La clave de la API vive en **`sitio/biblioteca/.env`** (no se versiona). El
+archivo se lo lee `settings.py` directamente, sin dependencias extra:
+
+```
+IA_API_KEY='tu-clave'
+```
+
+| Variable | Sin ella | Con ella |
+|---|---|---|
+| `IA_API_KEY` | La vista avisa que no hay clave (no falla) | La IA responde preguntas del catálogo |
+| `IA_API_URL` | `https://generativelanguage.googleapis.com/v1beta` | La URL del proveedor que se use |
+| `IA_MODEL` | `gemini-2.5-flash` | El modelo elegido |
+
+El proyecto usa **Google AI Studio (Gemini)**: la clave se saca del panel de
+AI Studio (Get API key → Create API key). La URL y el modelo son configurables
+por si se cambia de proveedor. En Vercel la clave se carga como variable de
+entorno (`IA_API_KEY`) en vez del archivo, que no se despliega.
 
 ---
 

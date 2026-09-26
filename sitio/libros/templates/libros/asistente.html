@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block title %}Asistente con IA{% endblock %}
+
+{% block content %}
+    <h2>Asistente con IA</h2>
+    <p>Preguntá por los libros, autores, categorías, lectores o préstamos de la biblioteca.</p>
+
+    <form method="post">
+        {% csrf_token %}
+        <p>
+            <label for="pregunta">Tu pregunta:</label>
+        </p>
+        <p>
+            <textarea id="pregunta" name="pregunta" rows="4" cols="60" required></textarea>
+        </p>
+        <p>
+            <button type="submit">Preguntar</button>
+        </p>
+    </form>
+
+    {% if error %}
+        <p><strong>{{ error }}</strong></p>
+    {% endif %}
+
+    {% if respuesta %}
+        <hr>
+        <h3>Respuesta</h3>
+        <p>{{ respuesta|linebreaks }}</p>
+    {% endif %}
+{% endblock %}
