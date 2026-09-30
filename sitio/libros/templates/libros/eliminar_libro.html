@@ -6,18 +6,73 @@
     <div>
         <h2>Eliminar libro</h2>
         <p>¿Seguro que querés eliminar <strong>{{ libro.titulo }}</strong>?</p>
-        <p>ISBN: {{ libro.isbn }} | Año: {{ libro.anio_publicacion }} | Categoría: {{ libro.categoria.nombre }}</p>
+        <p>ISBN: {{ libro.isbn }} | Año: {{ libro.anio_publicacion }} | Categoría: {{ libro.categoria }}</p>
 
         {% if prestamos_activos > 0 %}
             <p><strong>Atención:</strong> este libro tiene {{ prestamos_activos }} préstamo(s) activo(s).
             Al eliminarlo se borran también todos sus préstamos.</p>
         {% endif %}
 
-        <form method="post">
+        {% if error %}
+            <p><strong>{{ error }}</strong></p>
+        {% endif %}
+
+        <p>¿Con qué microservicio querés borrarlo?</p>
+        <style>
+            .boton-servicio {
+                cursor: pointer;
+                border: 1px solid #888;
+                background: #eee;
+                padding: 4px 10px;
+            }
+            .boton-servicio:hover {
+                background: #d0d0d0;
+            }
+            .boton-servicio.seleccionado {
+                background: #c62828;
+                color: #fff;
+                border-color: #c62828;
+            }
+        </style>
+        <form method="post" id="form-libro">
             {% csrf_token %}
+            <input type="hidden" name="servicio" id="servicio" value="{{ servicio_elegido }}">
+            <p>
+                {% for servicio in servicios_crud %}
+                    <button type="button" class="boton-servicio"
+                            data-servicio="{{ servicio }}">{{ servicio }}</button>
+                {% endfor %}
+            </p>
             <button type="submit">Eliminar definitivamente</button>
         </form>
 
         <p><a href="{% url 'libros:detalle_libro' libro.id %}">Cancelar y volver al detalle</a></p>
     </div>
+
+    <script>
+        const servicioInput = document.getElementById("servicio");
+        const servicioGuardado = localStorage.getItem("servicio_crud");
+        if (servicioGuardado) {
+            servicioInput.value = servicioGuardado;
+        }
+
+        function marcarSeleccionado() {
+            document.querySelectorAll(".boton-servicio").forEach((boton) => {
+                boton.classList.toggle(
+                    "seleccionado",
+                    boton.dataset.servicio === servicioInput.value,
+                );
+            });
+        }
+
+        marcarSeleccionado();
+
+        document.querySelectorAll(".boton-servicio").forEach((boton) => {
+            boton.addEventListener("click", () => {
+                servicioInput.value = boton.dataset.servicio;
+                localStorage.setItem("servicio_crud", boton.dataset.servicio);
+                marcarSeleccionado();
+            });
+        });
+    </script>
 {% endblock %}

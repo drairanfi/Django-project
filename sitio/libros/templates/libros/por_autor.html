@@ -1,11 +1,17 @@
 {% extends "base.html" %}
 
-{% block title %}Autor: {{ autor.nombre }} {{ autor.apellido }}{% endblock %}
+{% block title %}Autor: {{ autor }}{% endblock %}
 
 {% block content %}
     <div>
-        <h2>{{ autor.nombre }} {{ autor.apellido }}</h2>
-        <p><strong>Nacionalidad:</strong> {{ autor.nacionalidad|default:"No informada" }}</p>
+        <h2>{{ autor }}</h2>
+        {% if servicios_caidos %}
+            <p><strong>Aviso:</strong> el microservicio {{ servicios_caidos|join:", " }} está caído.
+            Se usó <code>{{ servicio_origen }}</code> para mostrar los datos.</p>
+        {% endif %}
+        {% if error %}
+            <p><strong>{{ error }}</strong></p>
+        {% endif %}
         <h3>Libros de este autor</h3>
         <ul>
             {% for libro in libros %}

@@ -8,50 +8,88 @@ django.setup()
 
 from datetime import date
 
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "libros"))
+
+from django.conf import settings
 from django.contrib.auth.models import User
 
-from libros.models import Autor, Categoria, Libro
+from libros import servicios
 from prestamos.models import Lector, Prestamo
+
+
+def crear_libros_en_microservicio():
+    """Crea los libros de ejemplo en Supabase a través del microservicio.
+
+    Idempotente: si el ISBN ya existe, no lo vuelve a insertar (la tabla tiene
+    unique sobre isbn). Devuelve {isbn: libro_guardado}.
+    """
+    libros = [
+        {
+            "titulo": "Ficciones",
+            "isbn": "9788420633997",
+            "anio_publicacion": 1944,
+            "paginas": 176,
+            "categoria": "Ficción",
+            "autores": "Jorge Luis Borges",
+        },
+        {
+            "titulo": "El Aleph",
+            "isbn": "9788420633988",
+            "anio_publicacion": 1949,
+            "paginas": 194,
+            "categoria": "Ficción",
+            "autores": "Jorge Luis Borges",
+        },
+        {
+            "titulo": "Veinte mil leguas de viaje submarino",
+            "isbn": "9788420680554",
+            "anio_publicacion": 1870,
+            "paginas": 418,
+            "categoria": "Ficción",
+            "autores": "Julio Verne",
+        },
+        {
+            "titulo": "La vuelta al mundo en 80 días",
+            "isbn": "9788420600989",
+            "anio_publicacion": 1872,
+            "paginas": 290,
+            "categoria": "Ficción",
+            "autores": "Julio Verne",
+        },
+        {
+            "titulo": "Breve historia del tiempo",
+            "isbn": "9788474238745",
+            "anio_publicacion": 1988,
+            "paginas": 256,
+            "categoria": "Ciencia",
+            "autores": "Stephen Hawking",
+        },
+        {
+            "titulo": "El universo en una cáscara de nuez",
+            "isbn": "9788466625973",
+            "anio_publicacion": 2001,
+            "paginas": 224,
+            "categoria": "Ciencia",
+            "autores": "Stephen Hawking",
+        },
+    ]
+
+    guardados = {}
+    for libro in libros:
+        try:
+            datos = servicios.crear_libro("python", libro)
+            guardados[libro["isbn"]] = datos
+            print(f"insertado: {libro['titulo']}")
+        except servicios.MicroservicioNoDisponible as error:
+            print(f"AVISO: el microservicio no está disponible para {libro['titulo']} ({error})")
+
+    return guardados
 
 
 def crear_datos():
     print("Creando datos de ejemplo...")
-
-    ficcion = Categoria.objects.get_or_create(nombre="Ficción")[0]
-    ciencia = Categoria.objects.get_or_create(nombre="Ciencia")[0]
-    historia = Categoria.objects.get_or_create(nombre="Historia")[0]
-
-    borges = Autor.objects.get_or_create(
-        nombre="Jorge Luis", apellido="Borges", nacionalidad="Argentina"
-    )[0]
-    verne = Autor.objects.get_or_create(
-        nombre="Julio", apellido="Verne", nacionalidad="Francia"
-    )[0]
-    hawking = Autor.objects.get_or_create(
-        nombre="Stephen", apellido="Hawking", nacionalidad="Inglaterra"
-    )[0]
-
-    libros = [
-        ("Ficciones", "9788420633997", 1944, 176, ficcion, [borges]),
-        ("El Aleph", "9788420633988", 1949, 194, ficcion, [borges]),
-        ("Veinte mil leguas de viaje submarino", "9788420680554", 1870, 418, ficcion, [verne]),
-        ("La vuelta al mundo en 80 días", "9788420600989", 1872, 290, ficcion, [verne]),
-        ("Breve historia del tiempo", "9788474238745", 1988, 256, ciencia, [hawking]),
-        ("El universo en una cáscara de nuez", "9788466625973", 2001, 224, ciencia, [hawking]),
-    ]
-
-    for titulo, isbn, anio, paginas, categoria, autores in libros:
-        libro = Libro.objects.get_or_create(
-            titulo=titulo,
-            defaults={
-                "isbn": isbn,
-                "anio_publicacion": anio,
-                "paginas": paginas,
-                "categoria": categoria,
-                "disponible": True,
-            },
-        )[0]
-        libro.autores.set(autores)
 
     ana = Lector.objects.get_or_create(
         nombre="Ana García", email="ana@mail.com", telefono="11-2222-3333"
@@ -60,16 +98,22 @@ def crear_datos():
         nombre="Carlos Pérez", email="carlos@mail.com", telefono="11-4444-5555"
     )[0]
 
-    if Prestamo.objects.count() == 0:
-        f = Libro.objects.get(titulo="Ficciones")
-        Prestamo.objects.create(lector=ana, libro=f, estado="activo")
-        f.disponible = False
-        f.save()
+    libros = crear_libros_en_microservicio()
 
-        a = Libro.objects.get(titulo="El Aleph")
-        Prestamo.objects.create(
-            lector=carlos, libro=a, estado="devuelto", fecha_devolucion=date(2026, 9, 1)
-        )
+    if libros and Prestamo.objects.count() == 0:
+        f = libros.get("9788420633997")
+        if f:
+            Prestamo.objects.create(lector=ana, libro_id=f["id"], estado="activo")
+            try:
+                servicios.editar_libro("python", f["id"], {"disponible": False})
+            except servicios.MicroservicioNoDisponible:
+                pass
+
+        a = libros.get("9788420633988")
+        if a:
+            Prestamo.objects.create(
+                lector=carlos, libro_id=a["id"], estado="devuelto", fecha_devolucion=date(2026, 9, 1)
+            )
 
     if not User.objects.filter(username="admin").exists():
         User.objects.create_superuser("admin", "admin@mail.com", "admin123")

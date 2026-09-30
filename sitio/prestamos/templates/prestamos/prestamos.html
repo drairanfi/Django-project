@@ -19,7 +19,7 @@
             </tr>
             {% for prestamo in prestamos %}
                 <tr>
-                    <td>{{ prestamo.libro.titulo }}</td>
+                    <td><a href="{% url 'libros:detalle_libro' prestamo.libro_id %}">{{ prestamo.titulo_libro }}</a></td>
                     <td><a href="{% url 'prestamos:detalle_lector' prestamo.lector.id %}">{{ prestamo.lector.nombre }}</a></td>
                     <td>{{ prestamo.fecha_prestamo }}</td>
                     <td>{{ prestamo.get_estado_display }}</td>

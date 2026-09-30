@@ -18,13 +18,14 @@ de libros, autores, categorías, lectores y el préstamo/devolución de ejemplar
 7. [Vistas y rutas](#-vistas-y-rutas)
 8. [Funcionalidades](#-funcionalidades)
 9. [Cómo montar el proyecto desde cero](#-cómo-montar-el-proyecto-desde-cero)
-10. [Cómo ejecutar el proyecto](#-cómo-ejecutar-el-proyecto)
+10. [Cómo ejecutar el proyecto](#-cómo-ejecutar-el-proyecto) — arranque rápido de cada servicio en [`COMO_ARRANCAR.md`](COMO_ARRANCAR.md)
 11. [Datos de ejemplo](#-datos-de-ejemplo)
 12. [Panel de administración](#-panel-de-administración)
 13. [Tests](#-tests)
-14. [Microservicio externo de reseñas](#-microservicio-externo-de-reseñas)
-15. [Asistente con IA](#-asistente-con-ia)
-16. [Tecnologías utilizadas](#-tecnologías-utilizadas)
+14. [CRUD de libros por microservicio](#-crud-de-libros-por-microservicio)
+15. [Microservicio externo de reseñas](#-microservicio-externo-de-reseñas)
+16. [Asistente con IA](#-asistente-con-ia)
+17. [Tecnologías utilizadas](#-tecnologías-utilizadas)
 
 ---
 
@@ -174,14 +175,14 @@ proyecto_django_biblioteca/
 │   ├── wsgi.py / asgi.py      → Puntos de entrada para servidores
 │   └── __init__.py
 ├── libros/                    → App 1: catálogo de libros
-│   ├── models.py              → Autor, Categoria, Libro
+│   ├── models.py              → Vacío a propósito: los libros viven en Supabase
 │   ├── views.py               → 9 vistas basadas en funciones (patron context)
 │   ├── urls.py                → Rutas de la app libros
-│   ├── admin.py               → Registro de modelos en el admin
+│   ├── services.py            → Clientes HTTP de los 4 microservicios
 │   ├── migrations/            → Migraciones de la app
 │   └── templates/libros/      → Plantillas HTML de la app
 ├── prestamos/                 → App 2: gestión de préstamos
-│   ├── models.py              → Lector, Prestamo
+│   ├── models.py              → Lector, Prestamo (libro_id suelto, sin FK)
 │   ├── views.py               → 5 vistas basadas en funciones (patron context)
 │   ├── urls.py                → Rutas de la app prestamos
 │   ├── admin.py               → Registro de modelos en el admin
@@ -192,8 +193,13 @@ proyecto_django_biblioteca/
 │   └── base.html              → Plantilla base con la navegación comun
 ├── manage.py                  → Utilidad de línea de comandos de Django
 ├── seed.py                    → Script de carga de datos de ejemplo
-├── db.sqlite3                 → Base de datos SQLite
+├── db.sqlite3                 → Base de datos SQLite (lectores y préstamos)
 └── README.md                  → Este documento
+
+microservicio_resenas/          → CRUD de libros y reseñas (FastAPI/Python)
+microservicio_resenas_nodejs/   → El mismo CRUD en NodeJS (sin dependencias)
+microservicio_resenas_java/     → El mismo CRUD en Java (JDK, sin build tools)
+microservicio_resenas_php/      → El mismo CRUD en PHP (servidor embebido)
 ```
 
 ### Modelo vista-controlador de Django (flujo de una petición)
@@ -218,35 +224,46 @@ biblioteca/urls.py  ── include('libros.urls') ──►  libros/urls.py
 
 ## 💾 Modelos y relaciones
 
-### App `libros`
+### App `libros` — sin modelos: los libros viven en Supabase
 
-| Modelo | Campos | Relaciones |
+Los libros **no** tienen modelo en Django. Viven en la tabla `libros` de Supabase
+y los expone un microservicio (ver [sección dedicada](#-microservicio-de-libros-y-reseñas)).
+`models.py` de `libros/` está vacío a propósito. La tabla tiene estos campos:
+
+| Campo | Tipo | Descripción |
 |---|---|---|
-| **Autor** | `nombre`, `apellido`, `nacionalidad`, `fecha_nacimiento` | — |
-| **Categoria** | `nombre` | — |
-| **Libro** | `titulo`, `isbn`, `anio_publicacion`, `paginas`, `disponible` | `categoria` → ForeignKey a `Categoria` · `autores` → ManyToMany a `Autor` |
+| `id` | bigint | Identificador |
+| `titulo` | text | Título del libro |
+| `isbn` | text (único) | ISBN |
+| `anio_publicacion` | integer | Año de publicación |
+| `paginas` | integer | Cantidad de páginas |
+| `disponible` | boolean | `True` disponible, `False` prestado |
+| `categoria` | text | Nombre de la categoría |
+| `autores` | text | Autores separados por coma |
+| `creada_en` | timestamptz | Fecha de creación |
 
 ### App `prestamos`
 
 | Modelo | Campos | Relaciones |
 |---|---|---|
 | **Lector** | `nombre`, `email`, `telefono`, `fecha_registro` | — |
-| **Prestamo** | `fecha_prestamo`, `fecha_devolucion`, `estado` | `lector` → ForeignKey a `Lector` · `libro` → ForeignKey a `Libro` |
+| **Prestamo** | `fecha_prestamo`, `fecha_devolucion`, `estado`, `libro_id` | `lector` → ForeignKey a `Lector` · `libro_id` suelto (sin FK) |
 
 ```python
-# sitio/prestamos/models.py:20-28
+# sitio/prestamos/models.py
 class Prestamo(models.Model):
     ESTADO_CHOICES = [("activo", "Activo"), ("devuelto", "Devuelto"), ("vencido", "Vencido")]
     lector = models.ForeignKey(Lector, on_delete=models.CASCADE, related_name="prestamos")
-    libro = models.ForeignKey(Libro, on_delete=models.CASCADE, related_name="prestamos")
+    libro_id = models.IntegerField()  # los libros viven en Supabase, no en SQLite
     fecha_prestamo = models.DateField(auto_now_add=True)
     fecha_devolucion = models.DateField(null=True, blank=True)
     estado = models.CharField(max_length=10, choices=ESTADO_CHOICES, default="activo")
 ```
 
-**Relación clave del negocio:** `Prestamo` une a un `Lector` con un `Libro`. El campo
-`disponible` del libro se pone en `False` al prestarlo y vuelve a `True` al devolverlo.
-Ese cambio de estado lo hace la **vista** (no el template), con `libro.save()`.
+**Relación clave del negocio:** `Prestamo` une a un `Lector` con un `libro_id`.
+El campo `disponible` del libro se pone en `False` al prestarlo y vuelve a `True`
+al devolverlo. Ese cambio de estado se hace **por HTTP al microservicio** (el libro
+no está en SQLite), desde la vista, nunca en el template.
 
 ---
 
@@ -389,11 +406,42 @@ python manage.py createsuperuser
 
 ## ▶️ Cómo ejecutar el proyecto
 
-Ya con el entorno montado (o usando el `venv/` que viene en el zip):
+> El arranque detallado de cada servicio (sitio + los 4 microservicios) y cómo
+> queda la resiliencia cuando se cae uno está en [`COMO_ARRANCAR.md`](COMO_ARRANCAR.md).
+
+El `manage.py` vive en `sitio/` y el entorno virtual en la **raíz** del repo
+(`venv/`), no dentro de `sitio/`. Todos los comandos de Django se corren desde
+`sitio/` usando el binario del venv de la raíz.
+
+### 1. Instalar dependencias (solo la primera vez)
 
 ```bash
-python manage.py runserver
+venv/bin/pip install -r sitio/requirements.txt
 ```
+
+> Si te salta `ModuleNotFoundError: No module named 'whitenoise'` (o `psycopg`),
+> es esto: el venv quedó sin las dependencias instaladas.
+
+### 2. Crear la base de datos (solo la primera vez)
+
+`db.sqlite3` no se versiona, así que recién clonado no existe. Sin migrar, la
+home rompe con `OperationalError: no such table: libros_libro`:
+
+```bash
+cd sitio
+../venv/bin/python manage.py migrate
+../venv/bin/python seed.py
+```
+
+### 3. Levantar el servidor
+
+```bash
+cd sitio
+../venv/bin/python manage.py runserver
+```
+
+> Aviso: `python manage.py runserver` a secas usa el intérprete del sistema, que
+> no tiene Django instalado. Siempre el binario del venv.
 
 Abrir en el navegador:
 
@@ -450,8 +498,11 @@ El proyecto incluye tests automáticos en `sitio/prestamos/tests.py` y `sitio/li
 | `test_si_el_microservicio_no_responde_la_pagina_igual_carga` | Si el microservicio falla, la vista responde 200 con un aviso — nunca un 500 |
 | `test_muestra_la_respuesta_que_devuelve_la_ia` | La vista del asistente renderiza lo que responde la API de IA |
 | `test_si_la_ia_no_responde_la_pagina_igual_carga` | Si la IA falla o falta la clave, la vista responde 200 con un aviso |
-| `test_armar_contexto_biblioteca_incluye_los_datos_del_orm` | El contexto que se le pasa a la IA trae los libros de la base |
+| `test_armar_contexto_biblioteca_incluye_los_datos_del_microservicio` | El contexto que se le pasa a la IA trae los libros del microservicio |
 | `test_armar_contexto_biblioteca_incluye_el_funcionamiento_de_la_app` | El contexto de la IA describe cómo funciona un préstamo |
+| `test_cae_al_respaldo_cuando_el_primario_falla` | Si el microservicio primario de libros cae, la lectura usa el respaldo |
+| `test_cae_al_respaldo_cuando_el_primario_no_encuentra_el_libro` | El respaldo también cubre el caso "libro no encontrado" |
+| `test_crear_libro_guarda_en_el_microservicio_y_redirige` | El CRUD crea el libro en el microservicio elegido por el usuario |
 
 Para correrlos:
 
@@ -462,12 +513,12 @@ python manage.py test
 Salida esperada:
 
 ```
-Found 9 test(s).
+Found 19 test(s).
 System check identified no issues (0 silenced).
 OK
 ```
 
-Los tests de reseñas y del asistente usan `unittest.mock.patch` sobre
+Los tests de libros, reseñas y del asistente usan `unittest.mock.patch` sobre
 `libros.servicios`: **no hacen llamadas de red reales**. Un test que dependa de
 un servicio remoto falla cuando se cae internet, y eso no es una falla del código.
 
@@ -482,6 +533,65 @@ python manage.py check
 Salida esperada: `System check identified no issues (0 silenced).`
 
 ---
+
+## 🔄 CRUD de libros por microservicio
+
+El **agregar, editar y eliminar libros** no lo hace el ORM: lo hacen **4
+microservicios escritos en lenguajes distintos**, todos contra la misma tabla
+`libros` de Supabase.
+
+```
+Navegador
+   │
+   ▼
+Django: crear/editar/eliminar libro
+   │  el usuario elige el servicio con botones (se guarda en localStorage)
+   ▼
+Python (8001) │ NodeJS (8002) │ Java (8003) │ PHP (8004)
+   │  todos exponen el mismo CRUD: POST/PUT/DELETE /api/libros
+   ▼
+Supabase (PostgreSQL) — tabla libros
+```
+
+### Cómo funciona la elección del servicio
+
+1. En `crear_libro`, `editar_libro` y `eliminar_libro` hay **botones** para cada
+   lenguaje: `python`, `nodejs`, `java`, `php`.
+2. El usuario elige con cuál se ejecuta la operación; la elección se guarda en
+   `localStorage` (`servicio_crud`) y la próxima operación ya viene preseleccionada.
+3. La vista lee el `servicio` elegido del POST y llama a la función correspondiente
+   de `servicios.py` (`crear_libro`, `editar_libro`, `eliminar_libro`).
+
+Ejemplo — crear un libro con NodeJS:
+
+```python
+# sitio/libros/views.py
+servicio = request.POST.get("servicio", "python")   # lo eligieron los botones
+libro = servicios.crear_libro(servicio, formulario.datos_para_el_servicio())
+```
+
+### Resiliencia en la lectura
+
+La lectura del catálogo (`inicio`, `detalle`, por categoría/autor) **no depende
+de un solo servicio**. `servicios.obtener_libros()` recorre
+`MICROSERVICIOS_LIBROS_ORDEN_LECTURA` (`python` → `nodejs` → `java` → `php`) y
+usa el primero que responda:
+
+```python
+# sitio/biblioteca/settings.py
+MICROSERVICIOS_LIBROS_ORDEN_LECTURA = ["python", "nodejs", "java", "php"]
+```
+
+Si el primario (Python) se cae, el sitio sigue mostrando libros desde NodeJS —
+otro lenguaje, que no cae por el mismo motivo. La vista incluso muestra qué
+servicio respondió (`servicio_origen` en el context).
+
+### Y los préstamos
+
+`Prestamo` guarda `libro_id` suelto (sin ForeignKey). Al renderizar, la vista
+pide los libros al microservicio y arma un `{id: titulo}` para mostrar el nombre
+del libro. Al prestar/devolver, cambia `disponible` del libro con
+`servicios.editar_libro("python", libro_id, {"disponible": ...})`.
 
 ## 🌐 Microservicio externo de reseñas
 

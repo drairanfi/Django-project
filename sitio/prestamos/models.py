@@ -1,7 +1,5 @@
 from django.db import models
 
-from libros.models import Libro
-
 
 class Lector(models.Model):
     nombre = models.CharField(max_length=100)
@@ -21,10 +19,13 @@ class Prestamo(models.Model):
     ]
 
     lector = models.ForeignKey(Lector, on_delete=models.CASCADE, related_name="prestamos")
-    libro = models.ForeignKey(Libro, on_delete=models.CASCADE, related_name="prestamos")
+    # Los libros ya no viven en SQLite: viven en Supabase, y los expone un
+    # microservicio. Por eso acá se guarda solo el id y el título se pide por
+    # HTTP cuando hace falta. Sin ForeignKey a Libro.
+    libro_id = models.IntegerField()
     fecha_prestamo = models.DateField(auto_now_add=True)
     fecha_devolucion = models.DateField(null=True, blank=True)
     estado = models.CharField(max_length=10, choices=ESTADO_CHOICES, default="activo")
 
     def __str__(self):
-        return f"{self.libro} -> {self.lector} ({self.estado})"
+        return f"libro {self.libro_id} -> {self.lector} ({self.estado})"

@@ -10,7 +10,9 @@
             <p>{{ mensaje }}</p>
         {% endif %}
 
-        {% if libro.disponible %}
+        {% if not libro_existe %}
+            <p>No se pudo cargar el libro desde el microservicio.</p>
+        {% elif libro.disponible %}
             <form method="post">
                 {% csrf_token %}
                 <label for="lector_id">Elegí el lector:</label>

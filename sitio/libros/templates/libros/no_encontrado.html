@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+
+{% block title %}Libro no encontrado{% endblock %}
+
+{% block content %}
+    <div>
+        <h2>Libro no encontrado</h2>
+        {% if error %}
+            <p><strong>{{ error }}</strong></p>
+        {% else %}
+            <p>No existe un libro con el id {{ libro_id }} en el microservicio.</p>
+        {% endif %}
+        <p><a href="{% url 'libros:inicio' %}">Volver al catálogo</a></p>
+    </div>
+{% endblock %}

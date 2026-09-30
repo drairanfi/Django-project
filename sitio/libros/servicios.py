@@ -10,7 +10,6 @@ import urllib.request
 
 from django.conf import settings
 
-from .models import Categoria, Libro
 from prestamos.models import Lector, Prestamo
 
 
@@ -22,7 +21,11 @@ class IANoDisponible(Exception):
     """La API de IA no respondió, tardó demasiado o falta la clave en biblioteca/.env."""
 
 
-def _pedir(url, datos=None, timeout=5, error_cls=MicroservicioNoDisponible, cabeceras_extra=None):
+class LibroNoEncontrado(Exception):
+    """El microservicio respondió 404: el libro no existe."""
+
+
+def _pedir(url, datos=None, timeout=5, error_cls=MicroservicioNoDisponible, cabeceras_extra=None, metodo="GET"):
     """Hace la petición HTTP y devuelve el JSON ya parseado."""
     cuerpo = None
     cabeceras = {
@@ -33,29 +36,159 @@ def _pedir(url, datos=None, timeout=5, error_cls=MicroservicioNoDisponible, cabe
     if datos is not None:
         cuerpo = json.dumps(datos).encode("utf-8")
         cabeceras["Content-Type"] = "application/json"
+        if metodo == "GET":
+            metodo = "POST"
 
     if cabeceras_extra:
         cabeceras.update(cabeceras_extra)
 
-    peticion = urllib.request.Request(url, data=cuerpo, headers=cabeceras)
+    peticion = urllib.request.Request(url, data=cuerpo, headers=cabeceras, method=metodo)
 
     try:
         with urllib.request.urlopen(peticion, timeout=timeout) as respuesta:
             return json.loads(respuesta.read().decode("utf-8"))
+    except urllib.error.HTTPError as error:
+        if error.code == 404:
+            raise LibroNoEncontrado("el libro no existe")
+        raise error_cls(f"HTTP {error.code}") from error
     except (urllib.error.URLError, TimeoutError, ValueError) as error:
         raise error_cls(str(error)) from error
 
 
+def _pedir_con_respaldo(ruta, datos=None):
+    """Pide al microservicio primario y, si falla, al de respaldo.
+
+    Devuelve (json, url_que_respondio). Si los dos fallan, levanta
+    MicroservicioNoDisponible. El respaldo existe para que la lectura de
+    reseñas no dependa de un solo servicio: si el primario (Python) se cae,
+    el sitio sigue mostrando datos desde otro servicio escrito en otro
+    lenguaje (NodeJS).
+    """
+    urls = [
+        settings.MICROSERVICIO_RESENAS_URL,
+        settings.MICROSERVICIO_RESENAS_FALLBACK_URL,
+    ]
+    ultimo_error = None
+
+    for url in urls:
+        try:
+            datos_json = _pedir(f"{url}{ruta}", datos)
+            return datos_json, url
+        except MicroservicioNoDisponible as error:
+            ultimo_error = error
+
+    raise MicroservicioNoDisponible(str(ultimo_error))
+
+
 def obtener_resenas(libro_id):
-    """Trae las reseñas de un libro: {libro_id, cantidad, promedio, resenas}."""
-    url = f"{settings.MICROSERVICIO_RESENAS_URL}/libros/{libro_id}/resenas"
-    return _pedir(url)
+    """Trae las reseñas de un libro: {libro_id, cantidad, promedio, resenas}.
+
+    Con resiliencia: intenta el microservicio primario y, si no responde, el de
+    respaldo.
+    """
+    datos, _ = _pedir_con_respaldo(f"/libros/{libro_id}/resenas")
+    return datos
+
+
+def obtener_resenas_con_origen(libro_id):
+    """Igual que obtener_resenas pero además devuelve qué URL respondió.
+
+    La vista lo usa para mostrarle al usuario de dónde salieron los datos.
+    """
+    return _pedir_con_respaldo(f"/libros/{libro_id}/resenas")
 
 
 def obtener_todas_resenas():
-    """Trae todas las reseñas del microservicio: {cantidad, resenas}."""
-    url = f"{settings.MICROSERVICIO_RESENAS_URL}/resenas"
-    return _pedir(url)
+    """Trae todas las reseñas: {cantidad, resenas}.
+
+    Con resiliencia: intenta el microservicio primario y, si no responde, el de
+    respaldo.
+    """
+    datos, _ = _pedir_con_respaldo("/resenas")
+    return datos
+
+
+def _pedir_a_servicio_libros(servicio, ruta, datos=None, metodo="GET"):
+    """Pide a un microservicio de libros concreto, por su nombre de lenguaje."""
+    url = settings.MICROSERVICIOS_LIBROS[servicio] + ruta
+    return _pedir(url, datos=datos, metodo=metodo)
+
+
+def obtener_libros():
+    """Trae todos los libros: {cantidad, libros}.
+
+    Resiliencia: recorre MICROSERVICIOS_LIBROS_ORDEN_LECTURA y devuelve el
+    primer servicio que responda. Devuelve (datos, servicio_que_respondio,
+    servicios_caidos): los caídos son los que no respondieron antes de dar con
+    el que sí lo hizo, para que la vista pueda avisar al usuario.
+    """
+    caidos = []
+    ultimo_error = None
+    for servicio in settings.MICROSERVICIOS_LIBROS_ORDEN_LECTURA:
+        try:
+            datos = _pedir_a_servicio_libros(servicio, "/libros")
+            return datos, servicio, caidos
+        except MicroservicioNoDisponible as error:
+            caidos.append(servicio)
+            ultimo_error = error
+    raise MicroservicioNoDisponible(str(ultimo_error))
+
+
+def obtener_libro(libro_id):
+    """Trae un libro por id con resiliencia: recorre los servicios hasta que uno responda."""
+    ultimo_error = None
+    for servicio in settings.MICROSERVICIOS_LIBROS_ORDEN_LECTURA:
+        try:
+            datos = _pedir_a_servicio_libros(servicio, f"/libros/{libro_id}")
+            return datos, servicio
+        except LibroNoEncontrado as error:
+            # El servicio respondió pero el libro no existe ahí. Se sigue
+            # probando el siguiente por si acaso hay datos desincronizados.
+            ultimo_error = error
+        except MicroservicioNoDisponible as error:
+            ultimo_error = error
+    if isinstance(ultimo_error, LibroNoEncontrado):
+        raise LibroNoEncontrado(str(ultimo_error))
+    raise MicroservicioNoDisponible(str(ultimo_error))
+
+
+def crear_libro(servicio, datos):
+    """Crea un libro en el microservicio elegido y devuelve el libro guardado."""
+    return _pedir_a_servicio_libros(servicio, "/libros", datos=datos, metodo="POST")
+
+
+def ejecutar_crud_con_respaldo(servicio_elegido, operacion, *args):
+    """Ejecuta una operación de CRUD con resiliencia.
+
+    Intenta primero el microservicio que eligió el usuario con los botones; si
+    no responde, cae a los demás en orden de lectura. Devuelve
+    (resultado, servicio_usado, servicios_caidos).
+    """
+    servicios_a_probar = [servicio_elegido] + [
+        s for s in settings.MICROSERVICIOS_LIBROS_ORDEN_LECTURA if s != servicio_elegido
+    ]
+    caidos = []
+    ultimo_error = None
+
+    for servicio in servicios_a_probar:
+        try:
+            resultado = operacion(servicio, *args)
+            return resultado, servicio, caidos
+        except MicroservicioNoDisponible as error:
+            caidos.append(servicio)
+            ultimo_error = error
+
+    raise MicroservicioNoDisponible(str(ultimo_error))
+
+
+def editar_libro(servicio, libro_id, datos):
+    """Actualiza un libro en el microservicio elegido y devuelve el libro guardado."""
+    return _pedir_a_servicio_libros(servicio, f"/libros/{libro_id}", datos=datos, metodo="PUT")
+
+
+def eliminar_libro(servicio, libro_id):
+    """Borra un libro en el microservicio elegido y devuelve la fila eliminada."""
+    return _pedir_a_servicio_libros(servicio, f"/libros/{libro_id}", metodo="DELETE")
 
 
 def crear_resena(libro_id, lector, puntaje, comentario):
@@ -145,26 +278,32 @@ def armar_contexto_biblioteca():
 
     lineas.append("DATOS ACTUALES DEL PROYECTO:")
     lineas.append("LIBROS:")
-    for libro in Libro.objects.all():
-        autores = ", ".join(str(autor) for autor in libro.autores.all())
-        estado = "disponible" if libro.disponible else "prestado"
+    try:
+        libros, _, _ = obtener_libros()
+        libros = libros.get("libros", [])
+    except MicroservicioNoDisponible:
+        libros = []
+    for libro in libros:
+        autores = libro.get("autores", "")
+        estado = "disponible" if libro.get("disponible") else "prestado"
         lineas.append(
-            f"- {libro.titulo} ({libro.anio_publicacion}), "
-            f"categoria {libro.categoria.nombre}, autores: {autores}, {estado}"
+            f"- {libro['titulo']} ({libro.get('anio_publicacion')}), "
+            f"categoria {libro.get('categoria', '')}, autores: {autores}, {estado}"
         )
 
     lineas.append("CATEGORIAS:")
-    for categoria in Categoria.objects.all():
-        lineas.append(f"- {categoria.nombre}")
+    for categoria in {libro.get("categoria", "") for libro in libros if libro.get("categoria")}:
+        lineas.append(f"- {categoria}")
 
     lineas.append("LECTORES:")
     for lector in Lector.objects.all():
         lineas.append(f"- {lector.nombre} ({lector.email})")
 
+    titulos = {libro["id"]: libro.get("titulo", "?") for libro in libros}
     lineas.append("PRESTAMOS:")
     for prestamo in Prestamo.objects.all():
         lineas.append(
-            f"- {prestamo.libro.titulo} -> {prestamo.lector.nombre} "
+            f"- {titulos.get(prestamo.libro_id, 'libro ' + str(prestamo.libro_id))} -> {prestamo.lector.nombre} "
             f"({prestamo.estado}, desde {prestamo.fecha_prestamo})"
         )
 

@@ -5,8 +5,12 @@
 {% block content %}
     <h2>Reseñas de {{ libro.titulo }}</h2>
     <p>
-        Datos servidos por el microservicio externo:
+        Datos servidos por el microservicio:
         <code>{{ url_microservicio }}</code>
+    </p>
+    <p>
+        Respaldo disponible si el principal falla:
+        <code>{{ url_respaldo }}</code>
     </p>
 
     {% if error %}

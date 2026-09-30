@@ -11,6 +11,6 @@ class LectorAdmin(admin.ModelAdmin):
 
 @admin.register(Prestamo)
 class PrestamoAdmin(admin.ModelAdmin):
-    list_display = ["libro", "lector", "fecha_prestamo", "estado"]
+    list_display = ["libro_id", "lector", "fecha_prestamo", "estado"]
     list_filter = ["estado"]
-    search_fields = ["lector__nombre", "libro__titulo"]
+    search_fields = ["lector__nombre"]

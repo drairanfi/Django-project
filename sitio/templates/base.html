@@ -14,6 +14,13 @@
         <a href="/admin/">Admin</a>
     </p>
     <hr>
+    {% if messages %}
+        <ul>
+            {% for message in messages %}
+                <li>{{ message }}</li>
+            {% endfor %}
+        </ul>
+    {% endif %}
     {% block content %}{% endblock %}
     <hr>
     <p>Proyecto Django - Biblioteca Comunitaria</p>

@@ -6,13 +6,24 @@
     <div>
         <h2>Catálogo de libros</h2>
         <p>Hay <strong>{{ disponibles }}</strong> libros disponibles en la biblioteca.</p>
+        <p>
+            Datos servidos por el microservicio:
+            <code>{{ servicio_origen }}</code>
+        </p>
+        {% if servicios_caidos %}
+            <p><strong>Aviso:</strong> el microservicio {{ servicios_caidos|join:", " }} está caído.
+            Se usó <code>{{ servicio_origen }}</code> para mostrar los datos.</p>
+        {% endif %}
+        {% if error %}
+            <p><strong>{{ error }}</strong></p>
+        {% endif %}
         <p><a href="{% url 'libros:crear_libro' %}">Agregar libro</a></p>
     </div>
 
     <div>
         <h3>Categorías</h3>
         {% for categoria in categorias %}
-            <a href="{% url 'libros:por_categoria' categoria.id %}">{{ categoria.nombre }}</a> |
+            <a href="{% url 'libros:por_categoria' categoria %}">{{ categoria }}</a> |
         {% endfor %}
     </div>
 
@@ -22,7 +33,7 @@
             {% for libro in libros %}
                 <li>
                     <a href="{% url 'libros:detalle_libro' libro.id %}">{{ libro.titulo }}</a>
-                    - {{ libro.categoria.nombre }}
+                    - {{ libro.categoria }}
                     {% if libro.disponible %}
                         (Disponible)
                     {% else %}

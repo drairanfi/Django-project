@@ -196,7 +196,50 @@ def _url_del_microservicio():
 
 MICROSERVICIO_RESENAS_URL = _url_del_microservicio().rstrip('/')
 
+# URL de respaldo para la lectura de reseñas. Es la pieza que da resiliencia:
+# si el microservicio primario (Python/FastAPI) no responde, el sitio intenta
+# este. Tiene que ser un microservicio escrito en un lenguaje DISTINTO de Python
+# (en el repo, NodeJS en el puerto 8002), para que no caiga por el mismo motivo
+# que el primario. En local se levanta aparte; en el servidor se define con la
+# URL del servicio desplegado.
+MICROSERVICIO_RESENAS_FALLBACK_URL = os.environ.get(
+    'MICROSERVICIO_RESENAS_FALLBACK_URL',
+    'http://127.0.0.1:8002/api',
+).rstrip('/')
+
 MICROSERVICIO_RESENAS_TIMEOUT = 5  # segundos
+
+
+# Microservicios de libros por lenguaje.
+# El CRUD de libros (agregar, editar, eliminar) no lo hace el ORM: lo hacen
+# microservicios escritos en 4 lenguajes distintos (Python, NodeJS, Java y PHP),
+# todos contra la misma tabla `libros` de Supabase. El usuario elige con cuál
+# se ejecuta cada operación desde la interfaz (botones), y la elección queda
+# guardada en el navegador. Cada URL es sobreescribible por variable de entorno;
+# los puertos en local son 8001 (Python), 8002 (NodeJS), 8003 (Java), 8004 (PHP).
+
+def _url_microservicio_libros(nombre, puerto):
+    return os.environ.get(
+        f'MICROSERVICIO_LIBROS_{nombre.upper()}_URL',
+        f'http://127.0.0.1:{puerto}/api',
+    ).rstrip('/')
+
+
+MICROSERVICIOS_LIBROS = {
+    'python': _url_microservicio_libros('python', 8001),
+    'nodejs': _url_microservicio_libros('nodejs', 8002),
+    'java': _url_microservicio_libros('java', 8003),
+    'php': _url_microservicio_libros('php', 8004),
+}
+
+# Orden en el que se prueban los servicios al LEER libros. El primero es el
+# primario; si falla, el sitio cae a los siguientes sin que el usuario se entere.
+MICROSERVICIOS_LIBROS_ORDEN_LECTURA = [
+    'python',
+    'nodejs',
+    'java',
+    'php',
+]
 
 
 # Asistente con IA

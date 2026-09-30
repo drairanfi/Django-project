@@ -5,8 +5,8 @@
 {% block content %}
     <div>
         <h2>Devolución registrada</h2>
-        <p>El libro <strong>{{ prestamo.libro.titulo }}</strong> fue devuelto por <strong>{{ prestamo.lector.nombre }}</strong>.</p>
+        <p>El libro <strong>{{ titulo_libro }}</strong> fue devuelto por <strong>{{ prestamo.lector.nombre }}</strong>.</p>
         <p>Fecha de devolución: {{ prestamo.fecha_devolucion }}</p>
-        <a href="{% url 'libros:detalle_libro' prestamo.libro.id %}">Volver al libro</a>
+        <a href="{% url 'libros:detalle_libro' prestamo.libro_id %}">Volver al libro</a>
     </div>
 {% endblock %}

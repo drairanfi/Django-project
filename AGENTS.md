@@ -18,12 +18,13 @@ un código peor para este repo.
 |---|---|
 | Python | 3.14.7 |
 | Django | 6.1.1 |
-| Base de datos | SQLite en local, PostgreSQL (Supabase) en el despliegue |
-| Microservicio | FastAPI + Supabase, en `microservicio_resenas/` (deps propias) |
+| Base de datos | SQLite (solo lectores/préstamos) y Supabase (libros y reseñas) |
+| Microservicios | 4 réplicas del CRUD de libros + reseñas: FastAPI/Python, NodeJS, Java, PHP |
 
-Sin CSS, sin JavaScript, sin frontend build. **No agregues librerías de frontend**
-(ni Bootstrap, ni Tailwind, ni HTMX) salvo pedido explícito. Las llamadas HTTP
-salientes usan `urllib` de la biblioteca estándar, no `requests`.
+Sin CSS, sin librerías de frontend, sin framework JS. **Las llamadas HTTP
+salientes usan `urllib` de la biblioteca estándar, no `requests`.** El único JS
+del proyecto es el que guarda en `localStorage` la elección de microservicio en
+los formularios de crear/editar/eliminar libro.
 
 `requirements.txt` tiene solo lo que el despliegue necesita: Django, `psycopg`
 (driver de PostgreSQL), `dj-database-url` (parsea `DATABASE_URL`) y `whitenoise`
@@ -31,7 +32,29 @@ salientes usan `urllib` de la biblioteca estándar, no `requests`.
 
 `microservicio_resenas/` es la excepción: es un servicio aparte, con su propio
 `requirements.txt` y su propio ciclo de vida. Sus dependencias NO se instalan en el
-`venv/` de Django.
+`venv/` de Django. Lo mismo para `microservicio_resenas_nodejs/`,
+`microservicio_resenas_java/` y `microservicio_resenas_php/` (sin dependencias
+externas: Node usa solo `node:http`, Java solo el JDK, PHP solo el servidor embebido).
+
+## Cómo funciona el CRUD de libros
+
+Los libros NO viven en SQLite: viven en la tabla `libros` de Supabase y los
+exponen 4 microservicios en lenguajes distintos (`microservicio_resenas/` en
+Python, `microservicio_resenas_nodejs/`, `microservicio_resenas_java/`,
+`microservicio_resenas_php/`). Cada uno tiene los mismos endpoints: GET/POST
+`/api/libros`, PUT/DELETE `/api/libros/{id}`.
+
+- El usuario elige con qué microservicio se ejecuta cada operación (crear,
+  editar, eliminar) desde botones en el formulario; la elección se guarda en
+  `localStorage`.
+- La lectura del catálogo es **resiliente**: `servicios.obtener_libros()` recorre
+  `MICROSERVICIOS_LIBROS_ORDEN_LECTURA` (python → nodejs → java → php) y usa el
+  primero que responda. Si el primario (Python) se cae, el sitio sigue mostrando
+  libros desde NodeJS.
+- `Prestamo` guarda `libro_id` suelto (sin ForeignKey): el título se pide al
+  microservicio al renderizar.
+- No existe modelo `Libro`, `Autor` ni `Categoria` en el ORM. `models.py` de
+  `libros/` está vacío a propósito.
 
 ## Comandos
 
@@ -50,12 +73,16 @@ python3 -m venv venv                     # solo la primera vez
 venv/bin/pip install -r requirements.txt
 
 venv/bin/python manage.py check          # validar configuración
-venv/bin/python manage.py test           # correr los 5 tests (usan SQLite)
+venv/bin/python manage.py test           # correr los tests (usan SQLite)
 venv/bin/python manage.py runserver      # levantar en http://127.0.0.1:8000/
 venv/bin/python manage.py makemigrations # tras tocar models.py
 venv/bin/python manage.py migrate
 venv/bin/python seed.py                  # datos de ejemplo (idempotente)
 ```
+
+Para probar el CRUD de libros en local hay que levantar al menos el microservicio
+Python (FastAPI, puerto 8001) y, si se quiere ver la resiliencia, el de NodeJS
+(puerto 8002): el sitio cae a NodeJS cuando Python no responde.
 
 Los comandos de Django hay que correrlos **desde `sitio/`**: el descubrimiento de
 tests parte del directorio actual, y desde la raíz del repo no encuentra ninguno.
@@ -85,11 +112,11 @@ Toda vista sigue esta estructura, sin excepciones. Es el patrón que el trabajo
 práctico tiene que demostrar:
 
 ```python
-def libros_por_categoria(request, categoria_id):
+def libros_por_categoria(request, categoria):
     """Una línea explicando qué hace la vista."""
-    # 1. consumir el modelo
-    categoria = get_object_or_404(Categoria, pk=categoria_id)
-    libros = Libro.objects.filter(categoria=categoria)
+    # 1. consumir los datos (del microservicio para libros)
+    libros = [l for l in servicios.obtener_libros()[0].get("libros", [])
+              if l.get("categoria") == categoria]
 
     # 2. armar el context como variable con nombre
     context = {
@@ -101,6 +128,11 @@ def libros_por_categoria(request, categoria_id):
     return render(request, "libros/por_categoria.html", context)
 ```
 
+Los libros ya no se leen con el ORM: vienen de un microservicio (Supabase) a
+través de `libros/servicios.py`. El patrón de los tres pasos se mantiene: la
+vista consume datos (por HTTP), arma el `context` y lo manda al template. Las
+vistas de `prestamos` (Lector, Prestamo) sí siguen usando el ORM.
+
 Reglas duras:
 
 - **Vistas basadas en funciones.** No conviertas nada a Class-Based Views.
@@ -111,9 +143,12 @@ Reglas duras:
 - **Docstring de una línea** por vista, en español.
 - La lógica de negocio (cambiar `libro.disponible`, guardar fechas) va en la vista,
   nunca en el template.
+- Toda llamada remota va en `try/except MicroservicioNoDisponible`: si el servicio
+  se cae, la vista muestra un aviso o degrada, nunca un 500.
 
-`get_object_or_404` es para buscar **un** objeto por PK. Para filtrar un queryset usá
-`.filter()` normal — una lista vacía es un resultado válido, no un 404.
+`get_object_or_404` es para buscar **un** objeto por PK en el ORM (Lector,
+Prestamo). Para los libros del microservicio, el 404 lo decide el servicio:
+`obtener_libro()` levanta `LibroNoEncontrado` cuando ninguno lo tiene.
 
 ### Templates: HTML plano, sin estilos
 
@@ -142,16 +177,26 @@ vercel.json             define los dos servicios y el enrutado por dominio
 sitio/                  SERVICIO 1 - el sitio web (Django)
   biblioteca/           configuración del proyecto (settings, urls raíz)
     .env                clave de la API de IA (no se versiona)
-  libros/               app 1: Autor, Categoria, Libro → 6 vistas (incluye asistente IA)
+  libros/               app 1: modelos vacíos (los libros viven en Supabase) → 9 vistas
   prestamos/            app 2: Lector, Prestamo → 5 vistas
   templates/            base.html (compartido)
   requirements.txt      dependencias del sitio
   seed.py               datos de ejemplo, idempotente
 
-microservicio_resenas/  SERVICIO 2 - la API de reseñas (FastAPI)
+microservicio_resenas/          SERVICIO 2 - CRUD de libros y reseñas (FastAPI/Python)
   main.py               endpoints, todos bajo /api
   requirements.txt      dependencias de la API
   schema.sql            tabla resenas en Supabase
+  schema_libros.sql     tabla libros en Supabase
+
+microservicio_resenas_nodejs/   SERVICIO 3 - el mismo CRUD en NodeJS (node:http, sin deps)
+  server.js             endpoints, todos bajo /api
+
+microservicio_resenas_java/     SERVICIO 4 - el mismo CRUD en Java (HttpServer del JDK)
+  MicroservicioResenas.java  endpoints, todos bajo /api
+
+microservicio_resenas_php/      SERVICIO 5 - el mismo CRUD en PHP (php -S, sin deps)
+  router.php            endpoints, todos bajo /api
 ```
 
 Cada app tiene su `urls.py` con `app_name` definido y se incluye desde
@@ -196,6 +241,8 @@ de entorno y cae a valores de desarrollo cuando no están.
 | `DJANGO_SECRET_KEY` | la clave de desarrollo | la clave del servidor |
 | `DJANGO_DEBUG` | `True` | `False` si vale otra cosa |
 | `MICROSERVICIO_RESENAS_URL` | `http://127.0.0.1:8001` | la URL del servicio desplegado |
+| `MICROSERVICIO_RESENAS_FALLBACK_URL` | `http://127.0.0.1:8002` | la URL del servicio de respaldo |
+| `MICROSERVICIO_LIBROS_{LENGUAJE}_URL` | `http://127.0.0.1:{puerto}` | URL del microservicio de ese lenguaje |
 | `IA_API_KEY` | el asistente avisa que no hay clave | la IA responde preguntas del catálogo |
 
 `IA_API_KEY` (y opcionalmente `IA_API_URL` e `IA_MODEL`) se leen de

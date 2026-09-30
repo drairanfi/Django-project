@@ -1,10 +1,17 @@
 {% extends "base.html" %}
 
-{% block title %}Categoría: {{ categoria.nombre }}{% endblock %}
+{% block title %}Categoría: {{ categoria }}{% endblock %}
 
 {% block content %}
     <div>
-        <h2>Libros de {{ categoria.nombre }}</h2>
+        <h2>Libros de {{ categoria }}</h2>
+        {% if servicios_caidos %}
+            <p><strong>Aviso:</strong> el microservicio {{ servicios_caidos|join:", " }} está caído.
+            Se usó <code>{{ servicio_origen }}</code> para mostrar los datos.</p>
+        {% endif %}
+        {% if error %}
+            <p><strong>{{ error }}</strong></p>
+        {% endif %}
         <ul>
             {% for libro in libros %}
                 <li>
