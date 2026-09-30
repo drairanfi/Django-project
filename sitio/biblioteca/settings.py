@@ -218,15 +218,19 @@ MICROSERVICIO_RESENAS_TIMEOUT = 5  # segundos
 # guardada en el navegador. Cada URL es sobreescribible por variable de entorno;
 # los puertos en local son 8001 (Python), 8002 (NodeJS), 8003 (Java), 8004 (PHP).
 
-def _url_microservicio_libros(nombre, puerto):
+def _url_microservicio_libros(nombre, puerto, predeterminada=None):
     return os.environ.get(
         f'MICROSERVICIO_LIBROS_{nombre.upper()}_URL',
-        f'http://127.0.0.1:{puerto}/api',
+        predeterminada or f'http://127.0.0.1:{puerto}/api',
     ).rstrip('/')
 
 
 MICROSERVICIOS_LIBROS = {
-    'python': _url_microservicio_libros('python', 8001),
+    # El microservicio Python comparte dominio y despliegue con el sitio (Vercel
+    # Services), así que en el servidor su URL se deduce igual que la de
+    # reseñas. Los otros tres lenguajes se despliegan aparte y necesitan su
+    # variable de entorno; sin ella apuntan a los puertos locales.
+    'python': _url_microservicio_libros('python', 8001, MICROSERVICIO_RESENAS_URL),
     'nodejs': _url_microservicio_libros('nodejs', 8002),
     'java': _url_microservicio_libros('java', 8003),
     'php': _url_microservicio_libros('php', 8004),
