@@ -146,3 +146,24 @@ Tabla `libros`:
 
 RLS está activado y sin políticas públicas: solo la `service_role` key
 (atraviesa RLS) puede leer y escribir. Por eso esa clave **nunca** va al repo.
+
+## Desplegar en Vercel
+
+Esta carpeta es un proyecto Vercel aparte. El entrypoint serverless es
+`api/index.php`, que incluye `router.php`; el `vercel.json` usa el runtime
+comunitario `vercel-php@0.5.2` y manda `/api/*` a ese archivo.
+
+1. Vercel → **Add New → Project** → elegí este repo.
+2. **Root Directory** → `microservicio_resenas_php`.
+3. Environment Variables (Production, Preview, Development):
+   - `SUPABASE_URL`
+   - `SUPABASE_SERVICE_KEY`
+4. Deploy y verificá:
+
+```bash
+curl https://tu-php.vercel.app/api/salud
+curl https://tu-php.vercel.app/api/docs   # Swagger UI
+```
+
+> Ojo: `vercel-php` es un runtime de la comunidad, no soporte oficial de Vercel.
+> Si el build falla, revisá el log: puede cambiar entre versiones.

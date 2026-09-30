@@ -614,8 +614,9 @@ HTML;
 function openapi_json(): void
 {
     // Sirve la spec OpenAPI 3.0 del contrato completo (salud, libros y reseñas).
-    // La ruta es relativa al router, que es la raíz del servidor embebido.
-    $contenido = @file_get_contents('openapi.json');
+    // __DIR__ hace que funcione tanto local (php -S router.php) como en Vercel,
+    // donde el directorio de trabajo puede no ser la carpeta del router.
+    $contenido = @file_get_contents(__DIR__ . '/openapi.json');
     if ($contenido === false) {
         responder_json(500, ['detail' => 'No se pudo leer el archivo openapi.json']);
     }

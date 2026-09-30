@@ -167,3 +167,24 @@ curl -X POST http://127.0.0.1:8002/api/resenas \
   la spec desde `/api/openapi.json` (el archivo `openapi.json` de esta carpeta).
 - Comparte la tabla `resenas` de Supabase con el microservicio de Python en
   `microservicio_resenas/`. No toca Django ni el `vercel.json`.
+
+## Desplegar en Vercel
+
+Vercel detecta `server.js` automáticamente como entrypoint de un servidor
+Node.js (runtime oficial), así que no hace falta `vercel.json`. El `listen()`
+lo maneja la plataforma.
+
+1. Vercel → **Add New → Project** → elegí este repo.
+2. **Root Directory** → `microservicio_resenas_nodejs`.
+3. Environment Variables (Production, Preview, Development):
+   - `SUPABASE_URL`
+   - `SUPABASE_SERVICE_KEY`
+4. Deploy y verificá:
+
+```bash
+curl https://tu-node.vercel.app/api/salud
+curl https://tu-node.vercel.app/api/docs   # Swagger UI
+```
+
+> Ya está verificado en producción: `django-project-3u7k.vercel.app` responde
+> 200 en `/api/salud` y `/api/libros` con este mismo código.

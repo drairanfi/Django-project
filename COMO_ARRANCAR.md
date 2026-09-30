@@ -115,3 +115,48 @@ En `inicio` y `detalle_libro` el template muestra qué microservicio respondió
 Cada comando ocupa una terminal (bloquea mientras corre). Si preferís uno solo,
 levantá el sitio y el Python en terminales separadas y listo; los otros tres son
 opcionales y solo se necesitan cuando querés ver el failover.
+
+## Desplegar los microservicios en Vercel
+
+Vercel soporta los runtimes de **Node.js** y **PHP** (este último con un runtime
+comunitario). **Java no se puede desplegar en Vercel** (no existe runtime). Los
+microservicios de NodeJS y PHP ya tienen su `vercel.json` y su entrypoint
+(`api/index.js` y `api/index.php`) listos para desplegarse como proyectos
+separados.
+
+### NodeJS (recomendado)
+
+1. Entrá a [vercel.com](https://vercel.com) → **Add New → Project** y elegí este
+   repo.
+2. **Root Directory** → `microservicio_resenas_nodejs` (así Vercel usa el
+   `vercel.json` de esa carpeta).
+3. Environment Variables → Production, Preview, Development:
+   - `SUPABASE_URL` → tu Project URL
+   - `SUPABASE_SERVICE_KEY` → tu service_role key
+4. Deploy. Te da una URL tipo `https://tu-node.vercel.app`. Verificá:
+
+```bash
+curl https://tu-node.vercel.app/api/salud
+# {"estado":"ok"}
+curl https://tu-node.vercel.app/api/libros
+```
+
+### PHP (runtime comunitario)
+
+Igual que arriba pero Root Directory → `microservicio_resenas_php`. Ojo: el
+runtime `vercel-php@0.5.2` es de la comunidad (no soporte oficial de Vercel);
+si el build falla, revisá el log, porque puede cambiar entre versiones.
+
+### Apuntar el sitio a los servicios desplegados
+
+En el proyecto de Vercel del **sitio** (Django), Settings → Environment
+Variables, cargá las URLs de los microservicios:
+
+| Variable | Valor |
+|---|---|
+| `MICROSERVICIO_LIBROS_NODEJS_URL` | `https://tu-node.vercel.app/api` |
+| `MICROSERVICIO_LIBROS_PHP_URL` | `https://tu-php.vercel.app/api` |
+| `MICROSERVICIO_LIBROS_JAVA_URL` | la URL donde desplegues Java (Render, p. ej.) |
+
+Con eso la resiliencia pasa a producción: si el Python (que ya está en el mismo
+deploy del sitio) se cae, el sitio cae a NodeJS desplegado.
