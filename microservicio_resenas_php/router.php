@@ -96,12 +96,13 @@ function llamar_supabase(string $metodo, string $ruta, ?array $cuerpo = null): a
     $respuesta = @file_get_contents($url, false, $contexto);
 
     // El código de estado real viene en la primera línea de las cabeceras de
-    // respuesta, con forma "HTTP/1.1 200 OK". En PHP 8.5 se lee con
-    // http_get_last_response_headers() (la variable $http_response_header está
-    // deprecada desde 8.4).
+    // respuesta, con forma "HTTP/1.1 200 OK". http_get_last_response_headers()
+    // existe recién desde PHP 8.4; en versiones anteriores (como la del runtime
+    // vercel-php en Vercel, PHP 8.2) se usa la variable global
+    // $http_response_header, que se arma con cada respuesta de file_get_contents.
     $cabeceras_respuesta = function_exists('http_get_last_response_headers')
         ? http_get_last_response_headers()
-        : null;
+        : ($http_response_header ?? null);
 
     $estado = 502;
     if (is_array($cabeceras_respuesta) && isset($cabeceras_respuesta[0])
