@@ -33,6 +33,8 @@ completa con `/api` incluido).
 | Método | Ruta | Qué hace |
 |---|---|---|
 | GET | `/api/salud` | Health check: `{"estado": "ok"}` |
+| GET | `/api/docs` | Swagger UI interactivo (carga `/api/openapi.json`) |
+| GET | `/api/openapi.json` | Spec OpenAPI 3.0 del contrato completo |
 | GET | `/api/resenas` | Todas las reseñas, ordenadas por `creada_en` descendente |
 | GET | `/api/libros/{libro_id}/resenas` | Reseñas de un libro + promedio (el que consume Django) |
 | POST | `/api/resenas` | Crea una reseña (201) |
@@ -52,6 +54,11 @@ defaults de la base (`disponible` true, `categoria` '', años/páginas null). El
 `anio_publicacion`, `paginas` o `categoria` los limpia. Las validaciones
 responden **422** y si el id no existe responden **404** con
 `{"detail": "no encontrado"}`.
+
+`GET /api/docs` sirve Swagger UI desde el CDN de `swagger-ui-dist` (sin
+dependencias locales); la página carga la spec desde `/api/openapi.json`, que
+documenta el contrato completo (salud, libros y reseñas) tal como se entrega en
+el archivo `openapi.json` de la carpeta.
 
 Ejemplo de respuesta de `GET /api/libros/1/resenas`:
 

@@ -33,6 +33,8 @@ Navegador ──► Django (SQLite, local)
 | Método | Ruta | Qué hace |
 |---|---|---|
 | GET | `/api/salud` | Health check → `{"estado": "ok"}` |
+| GET | `/api/docs` | Swagger UI: documentación interactiva del contrato completo |
+| GET | `/api/openapi.json` | La spec OpenAPI 3.0 (`openapi.json`), que Swagger UI consume |
 | GET | `/api/resenas` | Todas las reseñas, ordenadas por `creada_en` descendente |
 | GET | `/api/libros/{libro_id}/resenas` | Reseñas de un libro + promedio (redondeado a 2 decimales, o `null`) |
 | POST | `/api/resenas` | Crea una reseña (status 201). Validación: `libro_id >= 1`, `lector` no vacío y ≤ 100 caracteres, `puntaje` 1..5, `comentario` opcional |
@@ -48,6 +50,10 @@ Navegador ──► Django (SQLite, local)
 | POST | `/api/libros` | Crea un libro (status 201). Validación: `titulo` e `isbn` no vacíos; `anio_publicacion` y `paginas` enteros o `null`; `disponible` booleano (default `true`); `categoria` texto (default `''`) |
 | PUT | `/api/libros/{id}` | Actualiza con cualquier subconjunto de `{titulo, isbn, anio_publicacion, paginas, disponible, categoria}`. 404 si el id no existe |
 | DELETE | `/api/libros/{id}` | Borra el libro y devuelve la fila borrada. 404 si el id no existe |
+
+`GET /api/docs` abre **Swagger UI** (CDN de unpkg, sin Composer), que carga la
+spec `openapi.json` desde `/api/openapi.json` y documenta el **contrato completo**:
+salud, CRUD de libros y CRUD de reseñas.
 
 Ejemplo de respuesta de `GET /api/libros/1/resenas`:
 

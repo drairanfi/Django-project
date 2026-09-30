@@ -7,6 +7,7 @@
 //
 // Sin dependencias externas: solo node:http y el fetch global (Node 20).
 
+import fs from "node:fs";
 import http from "node:http";
 
 const TABLA = "resenas";
@@ -33,6 +34,34 @@ const SUPABASE_URL = variable_obligatoria("SUPABASE_URL");
 const SUPABASE_SERVICE_KEY = variable_obligatoria("SUPABASE_SERVICE_KEY");
 const BASE_SUPABASE = `${SUPABASE_URL}/rest/v1`;
 const PUERTO = process.env.PORT || 8002;
+
+// La spec OpenAPI se lee una vez al arrancar y se sirve estática en
+// /api/openapi.json. Swagger UI la carga desde ahí para documentar el contrato.
+const SPEC_OPENAPI = fs.readFileSync(new URL("./openapi.json", import.meta.url), "utf8");
+
+// Página mínima de Swagger UI servida desde el CDN de unpkg: sin dependencias
+// npm, el navegador trae swagger-ui-dist y carga la spec local.
+const PAGINA_SWAGGER = `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>API - Swagger UI</title>
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
+</head>
+<body>
+  <div id="swagger-ui"></div>
+  <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+  <script>
+    window.onload = () => {
+      window.ui = SwaggerUIBundle({
+        url: "/api/openapi.json",
+        dom_id: "#swagger-ui",
+        deepLinking: true,
+      });
+    };
+  </script>
+</body>
+</html>`;
 
 // Cabeceras que exige PostgREST en TODA llamada. Content-Type solo va cuando
 // el request lleva body.
@@ -126,6 +155,20 @@ async function atender(req, res) {
   // GET /api/salud — health check de la plataforma.
   if (metodo === "GET" && ruta === "/api/salud") {
     return respuestaJson(res, 200, { estado: "ok" });
+  }
+
+  // GET /api/docs — Swagger UI que documenta el contrato completo.
+  if (metodo === "GET" && ruta === "/api/docs") {
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+    res.end(PAGINA_SWAGGER);
+    return;
+  }
+
+  // GET /api/openapi.json — la spec OpenAPI que carga Swagger UI.
+  if (metodo === "GET" && ruta === "/api/openapi.json") {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(SPEC_OPENAPI);
+    return;
   }
 
   // GET /api/resenas — todas las reseñas, de la más nueva a la más vieja.

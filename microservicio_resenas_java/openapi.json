@@ -1,0 +1,447 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Microservicio de libros y reseñas",
+    "description": "API de libros y reseñas almacenados en Supabase. El mismo contrato está implementado en 4 lenguajes: Python (FastAPI), NodeJS, Java y PHP. Todas las rutas cuelgan de /api porque el servicio comparte dominio con el sitio Django.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    { "url": "http://127.0.0.1:8001/api", "description": "Python (local)" },
+    { "url": "http://127.0.0.1:8002/api", "description": "NodeJS (local)" },
+    { "url": "http://127.0.0.1:8003/api", "description": "Java (local)" },
+    { "url": "http://127.0.0.1:8004/api", "description": "PHP (local)" }
+  ],
+  "tags": [
+    { "name": "salud", "description": "Health check del servicio" },
+    { "name": "libros", "description": "CRUD de libros" },
+    { "name": "resenas", "description": "Reseñas de libros" }
+  ],
+  "paths": {
+    "/salud": {
+      "get": {
+        "tags": ["salud"],
+        "summary": "Health check",
+        "operationId": "salud",
+        "responses": {
+          "200": {
+            "description": "El servicio está vivo",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "estado": { "type": "string", "example": "ok" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/libros": {
+      "get": {
+        "tags": ["libros"],
+        "summary": "Listar todos los libros",
+        "operationId": "listarLibros",
+        "responses": {
+          "200": {
+            "description": "Lista de libros ordenada de la más nueva a la más vieja",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "cantidad": { "type": "integer", "example": 6 },
+                    "libros": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/Libro" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Error de Supabase",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["libros"],
+        "summary": "Crear un libro",
+        "operationId": "crearLibro",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/LibroNuevo" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Libro creado",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Libro" }
+              }
+            }
+          },
+          "422": {
+            "description": "Validación fallida (titulo o isbn vacíos)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          },
+          "502": {
+            "description": "Error de Supabase",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/libros/{libro_id}": {
+      "get": {
+        "tags": ["libros"],
+        "summary": "Obtener un libro por id",
+        "operationId": "obtenerLibro",
+        "parameters": [
+          {
+            "name": "libro_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" },
+            "description": "Id del libro"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "El libro encontrado",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Libro" }
+              }
+            }
+          },
+          "404": {
+            "description": "El libro no existe",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          },
+          "502": {
+            "description": "Error de Supabase",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": ["libros"],
+        "summary": "Actualizar un libro (campos parciales)",
+        "operationId": "actualizarLibro",
+        "parameters": [
+          {
+            "name": "libro_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" },
+            "description": "Id del libro"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/LibroParcial" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Libro actualizado",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Libro" }
+              }
+            }
+          },
+          "404": {
+            "description": "El libro no existe",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          },
+          "422": {
+            "description": "No llega ningún campo para actualizar",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          },
+          "502": {
+            "description": "Error de Supabase",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["libros"],
+        "summary": "Eliminar un libro",
+        "operationId": "eliminarLibro",
+        "parameters": [
+          {
+            "name": "libro_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" },
+            "description": "Id del libro"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Libro eliminado",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Libro" }
+              }
+            }
+          },
+          "404": {
+            "description": "El libro no existe",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          },
+          "502": {
+            "description": "Error de Supabase",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/resenas": {
+      "get": {
+        "tags": ["resenas"],
+        "summary": "Listar todas las reseñas",
+        "operationId": "listarResenas",
+        "responses": {
+          "200": {
+            "description": "Lista de reseñas ordenada de la más nueva a la más vieja",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "cantidad": { "type": "integer" },
+                    "resenas": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/Resena" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Error de Supabase",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["resenas"],
+        "summary": "Crear una reseña",
+        "operationId": "crearResena",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ResenaNueva" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Reseña creada",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Resena" }
+              }
+            }
+          },
+          "422": {
+            "description": "Validación fallida (puntaje fuera de 1-5, lector vacío)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          },
+          "502": {
+            "description": "Error de Supabase",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/libros/{libro_id}/resenas": {
+      "get": {
+        "tags": ["resenas"],
+        "summary": "Reseñas de un libro con su promedio",
+        "operationId": "resenasDeLibro",
+        "parameters": [
+          {
+            "name": "libro_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" },
+            "description": "Id del libro"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Reseñas del libro con promedio",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "libro_id": { "type": "integer" },
+                    "cantidad": { "type": "integer" },
+                    "promedio": {
+                      "type": "number",
+                      "nullable": true,
+                      "example": 4.5
+                    },
+                    "resenas": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/Resena" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Error de Supabase",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Libro": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "titulo": { "type": "string" },
+          "isbn": { "type": "string" },
+          "anio_publicacion": { "type": "integer", "nullable": true },
+          "paginas": { "type": "integer", "nullable": true },
+          "disponible": { "type": "boolean" },
+          "categoria": { "type": "string" },
+          "autores": { "type": "string", "description": "Autores separados por coma" },
+          "creada_en": { "type": "string", "format": "date-time" }
+        }
+      },
+      "LibroNuevo": {
+        "type": "object",
+        "required": ["titulo", "isbn"],
+        "properties": {
+          "titulo": { "type": "string", "maxLength": 200, "example": "Ficciones" },
+          "isbn": { "type": "string", "maxLength": 20, "example": "9788420633997" },
+          "anio_publicacion": { "type": "integer", "example": 1944 },
+          "paginas": { "type": "integer", "example": 176 },
+          "disponible": { "type": "boolean", "default": true },
+          "categoria": { "type": "string", "example": "Ficción" },
+          "autores": { "type": "string", "example": "Jorge Luis Borges" }
+        }
+      },
+      "LibroParcial": {
+        "type": "object",
+        "description": "Cualquier subconjunto de campos a actualizar",
+        "properties": {
+          "titulo": { "type": "string" },
+          "isbn": { "type": "string" },
+          "anio_publicacion": { "type": "integer" },
+          "paginas": { "type": "integer" },
+          "disponible": { "type": "boolean" },
+          "categoria": { "type": "string" },
+          "autores": { "type": "string" }
+        }
+      },
+      "Resena": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "libro_id": { "type": "integer" },
+          "lector": { "type": "string" },
+          "puntaje": { "type": "integer", "minimum": 1, "maximum": 5 },
+          "comentario": { "type": "string" },
+          "creada_en": { "type": "string", "format": "date-time" }
+        }
+      },
+      "ResenaNueva": {
+        "type": "object",
+        "required": ["libro_id", "lector", "puntaje"],
+        "properties": {
+          "libro_id": { "type": "integer", "minimum": 1 },
+          "lector": { "type": "string", "maxLength": 100, "example": "Ana Gómez" },
+          "puntaje": { "type": "integer", "minimum": 1, "maximum": 5, "example": 5 },
+          "comentario": { "type": "string", "maxLength": 1000, "example": "Imperdible" }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "detail": { "type": "string" }
+        }
+      }
+    }
+  }
+}

@@ -577,6 +577,55 @@ function eliminar_libro(int $id): void
 }
 
 // ---------------------------------------------------------------------------
+// Documentación (Swagger UI)
+// ---------------------------------------------------------------------------
+
+function documentacion_swagger(): void
+{
+    // Página HTML de Swagger UI: carga la spec OpenAPI desde /api/openapi.json.
+    // Sin Composer ni librerías locales: el CSS y el JS vienen del CDN de unpkg.
+    header('Content-Type: text/html; charset=utf-8');
+    echo <<<HTML
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>API - Swagger UI</title>
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
+</head>
+<body>
+  <div id="swagger-ui"></div>
+  <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+  <script>
+    window.onload = () => {
+      window.ui = SwaggerUIBundle({
+        url: "/api/openapi.json",
+        dom_id: "#swagger-ui",
+        deepLinking: true,
+      });
+    };
+  </script>
+</body>
+</html>
+HTML;
+    exit;
+}
+
+function openapi_json(): void
+{
+    // Sirve la spec OpenAPI 3.0 del contrato completo (salud, libros y reseñas).
+    // La ruta es relativa al router, que es la raíz del servidor embebido.
+    $contenido = @file_get_contents('openapi.json');
+    if ($contenido === false) {
+        responder_json(500, ['detail' => 'No se pudo leer el archivo openapi.json']);
+    }
+
+    header('Content-Type: application/json; charset=utf-8');
+    echo $contenido;
+    exit;
+}
+
+// ---------------------------------------------------------------------------
 // Router: enruta la petición según método y ruta
 // ---------------------------------------------------------------------------
 
@@ -589,6 +638,14 @@ if ($SIN_CONFIGURACION) {
 
 if ($metodo === 'GET' && $ruta === '/api/salud') {
     salud();
+}
+
+if ($metodo === 'GET' && $ruta === '/api/docs') {
+    documentacion_swagger();
+}
+
+if ($metodo === 'GET' && $ruta === '/api/openapi.json') {
+    openapi_json();
 }
 
 if ($metodo === 'GET' && $ruta === '/api/resenas') {

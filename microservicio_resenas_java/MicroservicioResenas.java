@@ -7,6 +7,8 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -103,8 +105,15 @@ public class MicroservicioResenas {
     // Capa HTTP: enrutar la petición y enviar la respuesta
     // ---------------------------------------------------------------------
 
-    /** Respuesta HTTP mínima: código de estado y cuerpo JSON como texto. */
-    static record Respuesta(int codigo, String cuerpo) {}
+    /**
+     * Respuesta HTTP mínima: código de estado, cuerpo y tipo de contenido.
+     * Por defecto responde JSON (como toda la API); /api/docs usa HTML.
+     */
+    static record Respuesta(int codigo, String cuerpo, String tipoContenido) {
+        Respuesta(int codigo, String cuerpo) {
+            this(codigo, cuerpo, "application/json; charset=utf-8");
+        }
+    }
 
     /**
      * Atiende una petición entrante: lee el cuerpo, la enruta y responde.
@@ -143,7 +152,7 @@ public class MicroservicioResenas {
     static void enviar(HttpExchange intercambio, Respuesta respuesta) {
         try {
             byte[] bytes = respuesta.cuerpo().getBytes(StandardCharsets.UTF_8);
-            intercambio.getResponseHeaders().set("Content-Type", "application/json; charset=utf-8");
+            intercambio.getResponseHeaders().set("Content-Type", respuesta.tipoContenido());
             intercambio.sendResponseHeaders(respuesta.codigo(), bytes.length);
             try (var salida = intercambio.getResponseBody()) {
                 salida.write(bytes);
@@ -170,6 +179,20 @@ public class MicroservicioResenas {
         if (s.length == 3 && s[2].equals("salud")) {
             if (metodo.equals("GET")) {
                 return new Respuesta(200, "{\"estado\":\"ok\"}");
+            }
+            return metodoNoPermitido();
+        }
+
+        if (s.length == 3 && s[2].equals("docs")) {
+            if (metodo.equals("GET")) {
+                return servirDocs();
+            }
+            return metodoNoPermitido();
+        }
+
+        if (s.length == 3 && s[2].equals("openapi.json")) {
+            if (metodo.equals("GET")) {
+                return servirOpenapi();
             }
             return metodoNoPermitido();
         }
@@ -255,6 +278,57 @@ public class MicroservicioResenas {
             return Long.parseLong(texto);
         } catch (NumberFormatException e) {
             return -1;
+        }
+    }
+
+    // ---------------------------------------------------------------------
+    // Documentación (Swagger UI)
+    // ---------------------------------------------------------------------
+
+    /**
+     * GET /api/docs: página HTML de Swagger UI servida desde el CDN de
+     * swagger-ui-dist (sin dependencias locales). La página carga la spec desde
+     * /api/openapi.json, igual que FastAPI sirve su swagger en el original.
+     */
+    static Respuesta servirDocs() {
+        String html = """
+                <!DOCTYPE html>
+                <html lang="es">
+                <head>
+                  <meta charset="UTF-8">
+                  <title>API - Swagger UI</title>
+                  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
+                </head>
+                <body>
+                  <div id="swagger-ui"></div>
+                  <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+                  <script>
+                    window.onload = () => {
+                      window.ui = SwaggerUIBundle({
+                        url: "/api/openapi.json",
+                        dom_id: "#swagger-ui",
+                        deepLinking: true,
+                      });
+                    };
+                  </script>
+                </body>
+                </html>
+                """;
+        return new Respuesta(200, html, "text/html; charset=utf-8");
+    }
+
+    /**
+     * GET /api/openapi.json: la spec OpenAPI 3.0 del contrato completo (salud,
+     * libros y reseñas), leída del disco al responder. Si el archivo no está,
+     * 500 con un detalle claro: es un error del despliegue, no del cliente.
+     */
+    static Respuesta servirOpenapi() {
+        try {
+            String spec = Files.readString(Path.of("openapi.json"), StandardCharsets.UTF_8);
+            return new Respuesta(200, spec, "application/json; charset=utf-8");
+        } catch (IOException e) {
+            return new Respuesta(500,
+                    "{\"detail\":\"No se pudo leer openapi.json: " + Json.escapar(e.getMessage()) + "\"}");
         }
     }
 

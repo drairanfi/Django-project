@@ -35,6 +35,8 @@ servicio la ruta completa, con `/api` incluido.
 | Método | Ruta | Qué hace |
 |---|---|---|
 | GET | `/api/salud` | Health check de la plataforma |
+| GET | `/api/docs` | Swagger UI (documenta el contrato completo) |
+| GET | `/api/openapi.json` | Spec OpenAPI 3.0 que carga Swagger UI |
 | GET | `/api/resenas` | Todas las reseñas, ordenadas por `creada_en` descendente |
 | GET | `/api/libros/{libro_id}/resenas` | Reseñas de un libro + promedio — **el que consume Django** |
 | POST | `/api/resenas` | Crea una reseña (status 201) |
@@ -160,7 +162,8 @@ curl -X POST http://127.0.0.1:8002/api/resenas \
 
 ## Notas
 
-- Sin `npm install`, sin `node_modules`: solo `node:http` y el `fetch` global
-  de Node 20.
+- Sin `npm install`, sin `node_modules`: solo `node:http`, `node:fs` y el
+  `fetch` global de Node 20. Swagger UI se sirve desde el CDN de unpkg y carga
+  la spec desde `/api/openapi.json` (el archivo `openapi.json` de esta carpeta).
 - Comparte la tabla `resenas` de Supabase con el microservicio de Python en
   `microservicio_resenas/`. No toca Django ni el `vercel.json`.
