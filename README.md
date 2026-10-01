@@ -668,19 +668,18 @@ colgada esperando a un servidor que quizá nunca conteste.
 
 ```python
 # sitio/biblioteca/settings.py
-MICROSERVICIO_RESENAS_URL = os.environ.get(
-    'MICROSERVICIO_RESENAS_URL',
-    'http://127.0.0.1:8001',
-).rstrip('/')
-
+# Sin variable, la URL se deduce del dominio en producción (comparten despliegue)
+# y en local cae a http://127.0.0.1:8001/api.
+MICROSERVICIO_RESENAS_URL = _url_del_microservicio().rstrip('/')
 MICROSERVICIO_RESENAS_TIMEOUT = 5  # segundos
 ```
 
-La URL se lee de una variable de entorno. En local apunta al servicio corriendo
-en el puerto 8001; en la entrega apunta al servicio desplegado:
+En local apunta al servicio corriendo en el puerto 8001; en el servidor, al
+compartir dominio con la API, se deduce solo. Solo se define la variable si se
+quiere apuntar a un servicio distinto:
 
 ```bash
-export MICROSERVICIO_RESENAS_URL="https://tu-proyecto.vercel.app"
+export MICROSERVICIO_RESENAS_URL="https://tu-proyecto.vercel.app/api"
 venv/bin/python manage.py runserver
 ```
 
@@ -741,7 +740,11 @@ Dos detalles que rompen el despliegue si se pasan por alto:
    cuelgan de un `APIRouter(prefix="/api")`.
 
 Django deduce la URL de la API desde `VERCEL_URL`, que Vercel define solo: como
-comparten dominio, no hay que configurar nada.
+comparten dominio, no hay que configurar nada. Lo mismo vale para el
+microservicio de libros **Python**, que vive en el mismo despliegue: su URL se
+deduce igual que la de reseñas. Los de NodeJS y PHP, en cambio, se despliegan
+como proyectos Vercel aparte y se les apunta con `MICROSERVICIO_LIBROS_NODEJS_URL`
+y `MICROSERVICIO_LIBROS_PHP_URL` (ver [`COMO_ARRANCAR.md`](COMO_ARRANCAR.md)).
 
 ---
 

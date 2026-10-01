@@ -151,7 +151,7 @@ RLS está activado y sin políticas públicas: solo la `service_role` key
 
 Esta carpeta es un proyecto Vercel aparte. El entrypoint serverless es
 `api/index.php`, que incluye `router.php`; el `vercel.json` usa el runtime
-comunitario `vercel-php@0.5.2` y manda `/api/*` a ese archivo.
+comunitario `vercel-php@0.6.2` y manda `/api/*` a ese archivo.
 
 1. Vercel → **Add New → Project** → elegí este repo.
 2. **Root Directory** → `microservicio_resenas_php`.
@@ -164,6 +164,10 @@ comunitario `vercel-php@0.5.2` y manda `/api/*` a ese archivo.
 curl https://tu-php.vercel.app/api/salud
 curl https://tu-php.vercel.app/api/docs   # Swagger UI
 ```
+
+> Para que el sitio Django lo use como respaldo en la lectura de libros, cargá
+> la URL en el proyecto Vercel del sitio como `MICROSERVICIO_LIBROS_PHP_URL`
+> (ver [`COMO_ARRANCAR.md`](../COMO_ARRANCAR.md)).
 
 > Ojo: `vercel-php` es un runtime de la comunidad, no soporte oficial de Vercel.
 > Si el build falla, revisá el log: puede cambiar entre versiones.

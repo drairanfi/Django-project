@@ -144,7 +144,7 @@ curl https://tu-node.vercel.app/api/libros
 ### PHP (runtime comunitario)
 
 Igual que arriba pero Root Directory → `microservicio_resenas_php`. Ojo: el
-runtime `vercel-php@0.5.2` es de la comunidad (no soporte oficial de Vercel);
+runtime `vercel-php@0.6.2` es de la comunidad (no soporte oficial de Vercel);
 si el build falla, revisá el log, porque puede cambiar entre versiones.
 
 ### Apuntar el sitio a los servicios desplegados
@@ -157,6 +157,12 @@ Variables, cargá las URLs de los microservicios:
 | `MICROSERVICIO_LIBROS_NODEJS_URL` | `https://tu-node.vercel.app/api` |
 | `MICROSERVICIO_LIBROS_PHP_URL` | `https://tu-php.vercel.app/api` |
 | `MICROSERVICIO_LIBROS_JAVA_URL` | la URL donde desplegues Java (Render, p. ej.) |
+
+`MICROSERVICIO_LIBROS_PYTHON_URL` **no se carga**: el microservicio de libros
+Python comparte dominio y despliegue con el sitio, así que Django deduce su URL
+igual que la de reseñas. Las de nodejs y php, en cambio, son proyectos Vercel
+aparte: sin su variable, el sitio cae a los puertos locales y la lectura depende
+solo del Python.
 
 Con eso la resiliencia pasa a producción: si el Python (que ya está en el mismo
 deploy del sitio) se cae, el sitio cae a NodeJS desplegado.

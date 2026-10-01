@@ -186,5 +186,9 @@ curl https://tu-node.vercel.app/api/salud
 curl https://tu-node.vercel.app/api/docs   # Swagger UI
 ```
 
+> Para que el sitio Django lo use como respaldo en la lectura de libros, cargá
+> la URL en el proyecto Vercel del sitio como `MICROSERVICIO_LIBROS_NODEJS_URL`
+> (ver [`COMO_ARRANCAR.md`](../COMO_ARRANCAR.md)).
+
 > Ya está verificado en producción: `django-project-3u7k.vercel.app` responde
 > 200 en `/api/salud` y `/api/libros` con este mismo código.

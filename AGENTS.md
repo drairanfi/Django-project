@@ -243,6 +243,12 @@ de entorno y cae a valores de desarrollo cuando no están.
 | `MICROSERVICIO_RESENAS_URL` | `http://127.0.0.1:8001` | la URL del servicio desplegado |
 | `MICROSERVICIO_RESENAS_FALLBACK_URL` | `http://127.0.0.1:8002` | la URL del servicio de respaldo |
 | `MICROSERVICIO_LIBROS_{LENGUAJE}_URL` | `http://127.0.0.1:{puerto}` | URL del microservicio de ese lenguaje |
+
+Para `MICROSERVICIO_LIBROS_PYTHON_URL` el default no es localhost: al no estar
+definida, el microservicio de libros Python se deduce del dominio del proyecto
+igual que `MICROSERVICIO_RESENAS_URL` (comparten despliegue). Las de nodejs,
+java y php sí caen a los puertos locales y solo funcionan en el servidor si se
+les define la variable (los tres se despliegan como proyectos Vercel aparte).
 | `IA_API_KEY` | el asistente avisa que no hay clave | la IA responde preguntas del catálogo |
 
 `IA_API_KEY` (y opcionalmente `IA_API_URL` e `IA_MODEL`) se leen de
@@ -277,7 +283,8 @@ Detalles que importan:
   `WSGI_APPLICATION` y corre `collectstatic` solo porque `STATIC_ROOT` está
   definido. No hace falta build command.
 - Django deduce la URL de la API desde `VERCEL_URL`: comparten dominio, así que no
-  hay que configurar nada.
+  hay que configurar nada. Lo mismo vale para el microservicio de libros Python,
+  que también vive en el mismo despliegue.
 
 ### Variables que hay que cargar en Vercel
 
@@ -290,10 +297,18 @@ Settings → Environment Variables, en Production, Preview y Development:
 | `DJANGO_DEBUG` | `False` |
 | `SUPABASE_URL` | Project URL de Supabase |
 | `SUPABASE_SERVICE_KEY` | la `service_role` key, no la `anon` |
+| `MICROSERVICIO_LIBROS_NODEJS_URL` | URL del microservicio de libros NodeJS desplegado (si querés resiliencia en la lectura) |
+| `MICROSERVICIO_LIBROS_PHP_URL` | URL del microservicio de libros PHP desplegado (ídem) |
 | `IA_API_KEY` | la clave de Google AI Studio (opcional: sin ella, el asistente avisa que no hay clave) |
 
 `MICROSERVICIO_RESENAS_URL` **no se carga**: Django la deduce del dominio del
 proyecto. Solo se define para apuntar a un servicio distinto.
+
+`MICROSERVICIO_LIBROS_PYTHON_URL` tampoco: el microservicio de libros Python
+comparte despliegue con el sitio, así que se deduce igual que la de reseñas.
+Las de nodejs y php **sí se cargan** si querés que la resiliencia funcione en
+producción (son proyectos Vercel aparte); sin ellas, el sitio cae a sus puertos
+locales y la lectura depende solo del Python.
 
 La `IA_API_KEY` se lee de una variable de entorno en Vercel: el archivo
 `sitio/biblioteca/.env` no se despliega. Sin la variable, el asistente muestra
