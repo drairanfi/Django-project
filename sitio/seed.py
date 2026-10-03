@@ -14,9 +14,11 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "libros"))
 
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.core.files import File
 
 from libros import servicios
 from prestamos.models import Lector, Prestamo
+from docentes.models import Docente
 
 
 def crear_libros_en_microservicio():
@@ -117,6 +119,29 @@ def crear_datos():
 
     if not User.objects.filter(username="admin").exists():
         User.objects.create_superuser("admin", "admin@mail.com", "admin123")
+
+    docentes = [
+        {
+            "nombre": "Omar Andrés Bonilla Acosta",
+            "cargo": "Docente Líder de Proyectos Integradores de Aula",
+            "foto": "omar.png",
+        },
+        {
+            "nombre": "Elfar Didier Morantes Sánchez",
+            "cargo": "Docente de Django",
+            "foto": "elfar.png",
+        },
+    ]
+    for datos in docentes:
+        docente, _ = Docente.objects.get_or_create(
+            nombre=datos["nombre"], defaults={"cargo": datos["cargo"]}
+        )
+        ruta = os.path.join(
+            os.path.dirname(__file__), "docentes", "img", datos["foto"]
+        )
+        if not docente.foto and os.path.exists(ruta):
+            with open(ruta, "rb") as archivo:
+                docente.foto.save(datos["foto"], File(archivo), save=True)
 
     print("¡Datos creados! Usuario admin -> usuario: admin, contraseña: admin123")
 

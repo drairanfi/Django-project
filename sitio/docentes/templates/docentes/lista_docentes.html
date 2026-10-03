@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block title %}Docentes{% endblock %}
+
+{% block content %}
+    <div>
+        <h2>Docentes involucrados</h2>
+        <table border="1">
+            <tr>
+                <th>Foto</th>
+                <th>Nombre</th>
+                <th>Cargo</th>
+            </tr>
+            {% for docente in docentes %}
+                <tr>
+                    <td>
+                        {% if docente.foto %}
+                            <img src="{{ docente.foto.url }}" alt="{{ docente.nombre }}" width="120">
+                        {% else %}
+                            Sin foto
+                        {% endif %}
+                    </td>
+                    <td>{{ docente.nombre }}</td>
+                    <td>{{ docente.cargo }}</td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="3">No hay docentes cargados todavía.</td></tr>
+            {% endfor %}
+        </table>
+    </div>
+{% endblock %}

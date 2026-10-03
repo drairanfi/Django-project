@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'libros',
     'prestamos',
+    'docentes',
 ]
 
 MIDDLEWARE = [
@@ -149,6 +150,11 @@ STATIC_URL = 'static/'
 
 # Carpeta donde collectstatic junta los estaticos antes de desplegar.
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+# Archivos subidos por el usuario (por ejemplo, las fotos de los docentes).
+# En local runserver los sirve solo con DEBUG=True (ver biblioteca/urls.py).
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
 
 STORAGES = {
     'default': {
